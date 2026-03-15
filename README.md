@@ -53,6 +53,9 @@ cd AutoRecon
 # 安装依赖
 pip install -r requirements.txt
 
+# 复制配置文件
+cp config.example.py config.py
+
 # 运行
 python recon.py -d example.com
 ```
@@ -103,21 +106,6 @@ AutoRecon is a modular automated reconnaissance framework designed for security 
 - 🎨 **Colored Logs** - Clear terminal output
 - ⚡ **Concurrent Execution** - Efficient async processing
 - 🔌 **Tool Integration** - Supports subfinder, nmap, httpx
-
-### 📦 Modules
-
-| Module | Function |
-|--------|----------|
-| `subdomain` | Subdomain enumeration |
-| `port` | Port scanning |
-| `directory` | Directory scanning |
-| `fingerprint` | Fingerprinting |
-| `whois` | Whois lookup |
-| `icp` | ICP备案查询 |
-| `cdn` | CDN detection |
-| `sensitive` | Sensitive info detection |
-| `takeover` | Subdomain takeover |
-| `waf` | WAF detection |
 
 ### 🚀 Quick Start
 
