@@ -3,27 +3,41 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Reports and output
-reports/
-*.html
-*.json
+# Reports and output (keep directory structure)
+reports/*.json
+reports/*.html
 
-# Executables (users should install their own)
-*.exe
-
-# Config with sensitive data
-config.py
+# Test files (keep stress_test.py as it's a module)
+# test_*.py
+*_test.py
 
 # IDE
 .idea/
 .vscode/
 *.swp
+*.swo
 
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
 
 # Temp files
 *.tmp
 *.temp
 *.log
+*.bak
+
+# Python virtual environment
+venv/
+env/
+.venv/
+.env
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Local config overrides (keep example)
+config.local.py

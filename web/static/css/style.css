@@ -1,0 +1,206 @@
+/* ============================================
+   AutoRecon Web UI - 样式文件
+   ============================================ */
+
+/* 变量定义 */
+:root {
+    --bg-light: #f8fafc;
+    --bg-card: #ffffff;
+    --border-color: #e2e8f0;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --accent: #3b82f6;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+}
+
+/* 基础样式 */
+body {
+    background: var(--bg-light);
+    color: var(--text-primary);
+    min-height: 100vh;
+}
+
+/* 卡片 */
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* 表单元素 */
+.form-control, .form-select {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.form-control:focus, .form-select:focus {
+    background: var(--bg-card);
+    border-color: var(--accent);
+    color: var(--text-primary);
+    box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.15);
+}
+
+/* 按钮 */
+.btn-primary {
+    background: var(--accent);
+    border: none;
+}
+
+.btn-primary:hover {
+    background: #2563eb;
+}
+
+.btn-outline-light {
+    color: var(--text-secondary);
+    border-color: var(--border-color);
+}
+
+.btn-outline-light:hover {
+    background: var(--bg-light);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+/* 复选框 */
+.form-check-input:checked {
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+/* 进度条 */
+.progress {
+    background: var(--bg-light);
+    height: 8px;
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, var(--accent), var(--success));
+}
+
+/* 状态徽章 */
+.status-badge {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+
+.status-pending { background: #fef3c7; color: #92400e; }
+.status-running { background: #dbeafe; color: #1e40af; }
+.status-completed { background: #dcfce7; color: #166534; }
+.status-failed { background: #fee2e2; color: #991b1b; }
+.status-cancelled { background: #f3f4f6; color: #4b5563; }
+
+/* 压力测试状态卡片 */
+#stressStatusCard .display-6 {
+    font-size: 1.75rem;
+    font-weight: 600;
+}
+
+#stressStatusCard .col-3 {
+    padding: 1rem;
+}
+
+#stressStatusCard .text-secondary {
+    font-size: 0.75rem;
+}
+
+/* 结果区块 */
+.result-section {
+    border-left: 3px solid var(--accent);
+    padding-left: 15px;
+    margin-bottom: 20px;
+}
+
+/* 日志容器 */
+.log-container {
+    background: #f1f5f9;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 15px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.log-line {
+    margin: 2px 0;
+}
+
+.log-info { color: var(--accent); }
+.log-success { color: var(--success); }
+.log-warning { color: var(--warning); }
+.log-error { color: var(--danger); }
+
+/* 标签页 */
+.nav-tabs {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.nav-tabs .nav-link {
+    color: var(--text-secondary);
+    border: none;
+    padding: 12px 20px;
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--accent);
+    background: transparent;
+    border-bottom: 2px solid var(--accent);
+}
+
+.nav-tabs .nav-link:hover {
+    color: var(--text-primary);
+}
+
+/* 表格 */
+.table {
+    color: var(--text-primary);
+}
+
+.table thead th {
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    background: var(--bg-light);
+}
+
+.table td {
+    border-top: 1px solid var(--border-color);
+}
+
+.table tbody tr:hover {
+    background: var(--bg-light);
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-light);
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* 标题 */
+h2 {
+    color: var(--text-primary);
+}
+
+/* 加载动画 */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}

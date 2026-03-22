@@ -12,6 +12,7 @@ import random
 import hashlib
 import json
 import os
+import ssl
 from typing import List, Dict, Optional, Any, Callable
 from dataclasses import dataclass, field
 from functools import wraps
@@ -280,10 +281,21 @@ class AsyncHTTPClient:
         self.session: Optional[aiohttp.ClientSession] = None
     
     async def __aenter__(self):
+        # 创建不验证 SSL 的连接器（解决某些 API 证书问题）
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
+        connector = aiohttp.TCPConnector(
+            limit=100, 
+            limit_per_host=10,
+            ssl=ssl_context
+        )
+        
         self.session = aiohttp.ClientSession(
             headers=self.headers,
             timeout=self.timeout,
-            connector=aiohttp.TCPConnector(limit=100, limit_per_host=10)
+            connector=connector
         )
         return self
     
