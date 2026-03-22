@@ -25,6 +25,7 @@ from core.async_engine import (
 )
 from modules.async_subdomain import AsyncSubdomainCollector
 from modules.vuln_scanner import VulnerabilityScanner
+from modules.sqli_scanner import IntelligentSQLiScanner
 from jinja2 import Environment, FileSystemLoader
 
 
@@ -36,7 +37,7 @@ class ReconToolV3:
     # 可用模块
     AVAILABLE_MODULES = [
         'subdomain', 'port', 'dir', 'fingerprint', 
-        'whois', 'cdn', 'sensitive', 'takeover', 'waf', 'vuln'
+        'whois', 'cdn', 'sensitive', 'takeover', 'waf', 'vuln', 'sqli'
     ]
     
     def __init__(
@@ -316,6 +317,18 @@ class ReconToolV3:
         self.results['vulnerabilities'] = scanner.get_results()
         return self.results['vulnerabilities']
     
+    async def run_sqli(self) -> Dict:
+        """SQL注入扫描 (智能化)"""
+        print("\n" + "-" * 55)
+        print("\u001b[36m[7] 智能 SQL 注入扫描\u001b[0m")
+        print("-" * 55)
+        
+        scanner = IntelligentSQLiScanner(self.target, threads=self.threads)
+        results = await scanner.run_full_scan()
+        
+        self.results['sqli'] = scanner.get_results()
+        return self.results['sqli']
+    
     async def run_all(self) -> Dict:
         """执行所有模块"""
         self._banner()
@@ -329,6 +342,7 @@ class ReconToolV3:
             'sensitive': self.run_sensitive,
             'fingerprint': self.run_fingerprint,
             'vuln': self.run_vuln,
+            'sqli': self.run_sqli,
         }
         
         for module in self.modules:
@@ -383,6 +397,7 @@ class ReconToolV3:
                 'fingerprints': len(self.results.get('fingerprint', {}).get('fingerprints', [])),
                 'vulnerabilities': len(self.results.get('vulnerabilities', [])),
                 'sensitive': len(self.results.get('sensitive', {}).get('findings', [])),
+                'sqli': len(self.results.get('sqli', [])),
             }
             
             html_content = template.render(
@@ -396,6 +411,7 @@ class ReconToolV3:
                 fingerprints=self.results.get('fingerprint'),
                 vulnerabilities=self.results.get('vulnerabilities'),
                 sensitive=self.results.get('sensitive'),
+                sqli=self.results.get('sqli'),
             )
             
             html_file = os.path.join(self.output_dir, f"{self.target}_report.html")
@@ -444,6 +460,11 @@ class ReconToolV3:
                 high = sum(1 for v in self.results['vulnerabilities'] if v.get('severity') == 'high')
                 print(f"  \u001b[31m[!] 安全问题: {count} 个 (高危: {high})\u001b[0m")
         
+        if 'sqli' in self.results:
+            count = len(self.results['sqli'])
+            if count > 0:
+                print(f"  \u001b[31m[!] SQL注入: {count} 个\u001b[0m")
+        
         print("-" * 55)
 
 
@@ -465,7 +486,8 @@ async def main():
   cdn         - CDN检测
   fingerprint - 指纹识别
   sensitive   - 敏感信息检测
-  vuln        - 漏洞扫描 (新增)
+  vuln        - 漏洞扫描
+  sqli        - 智能 SQL 注入扫描 (新增)
 '''
     )
     
