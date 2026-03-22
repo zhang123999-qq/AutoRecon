@@ -100,7 +100,7 @@ export class StressTester {
     /**
      * 开始轮询
      */
-    startPolling(testId, interval = 1000) {
+    startPolling(testId, interval = 500) {
         this.stopPolling();
         
         const poll = async () => {
@@ -111,6 +111,7 @@ export class StressTester {
             try {
                 const status = await this.getStatus(testId);
                 
+                // 实时更新进度
                 this.onProgress({
                     status: status.status,
                     progress: status.progress,

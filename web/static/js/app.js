@@ -344,26 +344,33 @@ class App {
         }
 
         // 显示状态卡片
-        document.getElementById('stressStatusCard').style.display = 'block';
-        document.getElementById('stressResultsCard').style.display = 'none';
-        document.getElementById('stressAnalysisCard').style.display = 'none';
+        const statusCard = document.getElementById('stressStatusCard');
+        if (statusCard) statusCard.style.display = 'block';
+        
+        const resultsCard = document.getElementById('stressResultsCard');
+        if (resultsCard) resultsCard.style.display = 'none';
+        
+        const analysisCard = document.getElementById('stressAnalysisCard');
+        if (analysisCard) analysisCard.style.display = 'none';
 
-        // 重置显示
-        document.getElementById('stressQps').textContent = '...';
-        document.getElementById('stressAvgTime').textContent = '...';
-        document.getElementById('stressErrorRate').textContent = '...';
-        document.getElementById('stressLevel').textContent = '-';
+        // 重置显示为测试中状态
+        const qpsEl = document.getElementById('stressQps');
+        const avgEl = document.getElementById('stressAvgTime');
+        const errEl = document.getElementById('stressErrorRate');
+        const lvlEl = document.getElementById('stressLevel');
+        
+        if (qpsEl) qpsEl.textContent = '...';
+        if (avgEl) avgEl.textContent = '...';
+        if (errEl) errEl.textContent = '...';
+        if (lvlEl) lvlEl.textContent = '测试中';
 
         try {
-            // 快速测试直接返回结果
-            if (mode === 'quick') {
-                const results = await this.stressTester.quickTest(url, concurrent, duration);
-                this.onStressComplete(results);
-            } else {
-                // 其他模式使用异步任务
-                const result = await this.stressTester.start(url, mode, concurrent, duration);
-                this.stressTester.startPolling(result.testId);
-            }
+            // 快速测试使用异步任务 + 轮询
+            const result = await this.stressTester.start(url, mode, concurrent, duration);
+            
+            // 开始轮询
+            this.stressTester.startPolling(result.testId, 500); // 500ms 轮询间隔
+            
         } catch (error) {
             alert('测试失败: ' + error.message);
             this.onStressError(error.message);
@@ -374,14 +381,30 @@ class App {
      * 压力测试进度回调
      */
     onStressProgress(data) {
+        // 实时更新状态卡片
         if (data.results && data.results.metrics) {
             const m = data.results.metrics;
-            document.getElementById('stressQps').textContent = m.throughput?.qps?.toFixed(1) || '0';
-            document.getElementById('stressAvgTime').textContent = m.response_time?.avg?.toFixed(0) || '0';
-            document.getElementById('stressErrorRate').textContent = (m.errors?.error_rate || 0).toFixed(1) + '%';
             
-            if (m.stress_level) {
-                document.getElementById('stressLevel').textContent = m.stress_level;
+            const qpsEl = document.getElementById('stressQps');
+            const avgEl = document.getElementById('stressAvgTime');
+            const errEl = document.getElementById('stressErrorRate');
+            
+            if (m.throughput && qpsEl) {
+                qpsEl.textContent = (m.throughput.qps || 0).toFixed(1);
+            }
+            if (m.response_time && avgEl) {
+                avgEl.textContent = (m.response_time.avg || 0).toFixed(0);
+            }
+            if (m.errors && errEl) {
+                errEl.textContent = (m.errors.error_rate || 0).toFixed(1) + '%';
+            }
+        }
+        
+        // 更新进度显示
+        if (data.phase) {
+            const lvlEl = document.getElementById('stressLevel');
+            if (lvlEl && data.status === 'running') {
+                lvlEl.textContent = '测试中';
             }
         }
     }

@@ -750,22 +750,52 @@ async def create_stress_test(request: StressTestRequest, background_tasks: Backg
 
 
 async def run_stress_test_task(test_id: str, request: StressTestRequest):
-    """后台压力测试任务"""
+    """后台压力测试任务（带实时更新）"""
+    from modules.stress_test import StressTester, StressTestConfig
+    
     try:
         stress_tasks[test_id].status = "running"
         stress_tasks[test_id].current_phase = "测试中"
         
-        # 运行测试
-        result = await run_stress_test(
-            url=request.url,
-            mode=request.mode,
-            concurrent=request.concurrent,
-            duration=request.duration
+        # 创建配置
+        config = StressTestConfig(
+            target_url=request.url,
+            concurrent_users=request.concurrent,
+            duration=request.duration,
+            timeout=request.timeout if hasattr(request, 'timeout') else 30
         )
+        
+        tester = StressTester(config)
+        
+        # 设置进度回调
+        async def on_progress(phase, current, total):
+            if test_id in stress_tasks:
+                metrics = tester.get_current_metrics()
+                stress_tasks[test_id].progress = int((current / total) * 100) if total > 0 else 0
+                stress_tasks[test_id].current_phase = f"{phase}: {metrics['total_requests']} 请求"
+                stress_tasks[test_id].results = {
+                    "metrics": {
+                        "throughput": {"qps": metrics['qps']},
+                        "response_time": {"avg": metrics['avg_response_time']},
+                        "errors": {"error_rate": metrics['error_rate']},
+                        "total_requests": metrics['total_requests'],
+                        "successful_requests": metrics['successful_requests'],
+                        "failed_requests": metrics['failed_requests']
+                    }
+                }
+        
+        tester.on_progress = on_progress
+        
+        # 运行测试
+        await tester.run()
+        
+        # 获取最终结果
+        result = tester.get_results()
         
         # 更新状态
         stress_tasks[test_id].status = "completed"
         stress_tasks[test_id].progress = 100
+        stress_tasks[test_id].current_phase = "完成"
         stress_tasks[test_id].results = result
         
     except Exception as e:

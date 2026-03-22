@@ -379,6 +379,24 @@ class StressTester:
                     self._running = False
                     break
     
+    def get_current_metrics(self) -> Dict:
+        """获取当前实时指标"""
+        elapsed = time.perf_counter() - self._start_time if self._start_time else 0
+        
+        # 实时计算
+        qps = self.metrics.total_requests / elapsed if elapsed > 0 else 0
+        avg_time = statistics.mean(list(self.response_times)[-100:]) if self.response_times else 0
+        
+        return {
+            "total_requests": self.metrics.total_requests,
+            "successful_requests": self.metrics.successful_requests,
+            "failed_requests": self.metrics.failed_requests,
+            "qps": qps,
+            "avg_response_time": avg_time,
+            "error_rate": self.metrics.error_rate,
+            "elapsed": elapsed
+        }
+    
     async def _run_concurrent_test(self, session: aiohttp.ClientSession):
         """并发测试"""
         semaphore = asyncio.Semaphore(self.config.max_concurrent)
