@@ -217,9 +217,17 @@ class IntelligentStressTest:
         return {
             "url": self.url,
             "warmup": {"avg_response_time": warmup_time},
-            "baseline": baseline_result['metrics'],
+            "baseline": {
+                "qps": baseline_result['metrics']['throughput']['qps'],
+                "avg_time": baseline_result['metrics']['response_time']['avg']
+            },
             "load_test": load_results,
-            "stress_test": stress_result['metrics'],
+            "stress_test": {
+                "qps": stress_result['metrics']['throughput']['qps'],
+                "avg_time": stress_result['metrics']['response_time']['avg'],
+                "error_rate": stress_result['metrics']['errors']['error_rate'],
+                "stress_level": stress_result['metrics']['stress_level']
+            },
             "analysis": {
                 "bottleneck_type": analysis.bottleneck_type.value,
                 "confidence": analysis.confidence,
@@ -235,7 +243,7 @@ class IntelligentStressTest:
         
         results = []
         concurrent = 5
-        max_concurrent = 500
+        max_concurrent = 200  # 降低最大并发，避免过长时间测试
         
         while concurrent <= max_concurrent:
             logger.info(f"测试并发: {concurrent}")
@@ -243,7 +251,7 @@ class IntelligentStressTest:
             result = await QuickStressTest.test_url(
                 self.url, 
                 concurrent=concurrent, 
-                duration=10
+                duration=5  # 减少每次测试时间
             )
             
             m = result['metrics']

@@ -802,8 +802,11 @@ async def quick_stress_test(request: StressTestRequest):
             concurrent=request.concurrent,
             duration=request.duration
         )
-        return result
+        # 使用 JSONResponse 确保正确计算 Content-Length
+        return JSONResponse(content=result)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
