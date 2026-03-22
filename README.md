@@ -1,136 +1,91 @@
-<div align="center">
+# 🔍 AutoRecon v3.0
 
-# 🔍 AutoRecon
-
-**自动化信息收集框架 | Automated Reconnaissance Framework**
+**异步信息收集框架 | Async Reconnaissance Framework**
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python)](https://www.python.org/)
+[![Async](https://img.shields.io/badge/Async-aiohttp-green)](https://docs.aiohttp.org/)
 [![License](https://img.shields.io/badge/License-GPL%20v3-green.svg)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/zhang123999-qq/AutoRecon?style=social)](https://github.com/zhang123999-qq/AutoRecon/stargazers)
-
-[English](#english) | [中文文档](#中文文档)
-
-</div>
 
 ---
 
-## 中文文档
+## ✨ v3.0 新特性
 
-### 🎯 简介
+- 🚀 **异步架构** - 基于 asyncio，性能提升 10x+
+- 📊 **HTML 报告** - 自动生成可视化扫描报告
+- 🔒 **漏洞扫描** - 检测敏感文件泄露、SQL注入、XSS等
+- 📚 **扩展字典** - 5000+ 子域名前缀，200+ 指纹
+- 💾 **智能缓存** - DNS 和 HTTP 结果缓存
+- 🎯 **多数据源** - DNS枚举、证书透明度、搜索引擎等
 
-AutoRecon 是一个模块化的自动化信息收集框架，专为安全研究人员和渗透测试人员设计。支持子域名枚举、端口扫描、指纹识别、CDN检测等多种功能。
+---
 
-### ✨ 特性
+## 📦 模块列表
 
-- 🔧 **模块化架构** - 10+ 独立模块，按需使用
-- 📊 **HTML报告** - 自动生成可视化报告
-- 🎨 **彩色日志** - 清晰的终端输出
-- ⚡ **并发执行** - 高效的异步处理
-- 🔌 **工具集成** - 支持 subfinder, nmap, httpx 等工具
+| 模块 | 功能 | 状态 |
+|------|------|------|
+| `subdomain` | 子域名收集 | ✅ |
+| `port` | 端口扫描 | ✅ |
+| `cdn` | CDN 检测 | ✅ |
+| `fingerprint` | 指纹识别 (200+) | ✅ |
+| `sensitive` | 敏感信息检测 | ✅ |
+| `vuln` | 漏洞扫描 | ✅ 新增 |
 
-### 📦 模块列表
+---
 
-| 模块 | 功能 |
-|------|------|
-| `subdomain` | 子域名枚举 |
-| `port` | 端口扫描 |
-| `directory` | 目录扫描 |
-| `fingerprint` | 指纹识别 |
-| `whois` | Whois 查询 |
-| `icp` | 备案查询 |
-| `cdn` | CDN 检测 |
-| `sensitive` | 敏感信息检测 |
-| `takeover` | 子域名接管检测 |
-| `waf` | WAF 检测与绕过 |
-
-### 🚀 快速开始
+## 🚀 快速开始
 
 ```bash
-# 克隆仓库
-git clone https://github.com/zhang123999-qq/AutoRecon.git
-cd AutoRecon
-
 # 安装依赖
-pip install -r requirements.txt
+pip install aiohttp dnspython jinja2
 
-# 复制配置文件
-cp config.example.py config.py
+# 快速扫描
+python recon_v3.py example.com
 
-# 运行
-python recon.py -d example.com
+# 全模块扫描
+python recon_v3.py example.com -m all
+
+# 漏洞扫描
+python recon_v3.py example.com -m vuln
+
+# 高并发
+python recon_v3.py example.com -t 100
 ```
 
-### 📋 依赖
+---
 
-- Python 3.8+
-- subfinder (可选)
-- nmap (可选)
-- httpx (可选)
+## 📊 性能对比
 
-### 📝 使用示例
+| 指标 | v2.3 | v3.0 |
+|------|------|------|
+| 架构 | 线程池 | asyncio |
+| 并发速度 | ~50/s | **600-700/s** |
+| 子域名字典 | 40+ | **5000+** |
+| 指纹库 | 30+ | **200+** |
+| 数据源 | 3个 | **5个** |
 
-```bash
-# 基础扫描
-python recon.py -d target.com
+---
 
-# 指定模块
-python recon.py -d target.com -m subdomain,port,fingerprint
+## 📝 输出示例
 
-# 完整扫描
-python recon.py -d target.com --full
-
-# 生成报告
-python recon.py -d target.com --report
+```
+扫描摘要
+-------------------------------------------------------
+  子域名: 459 个
+  开放端口: 5 个
+  CDN: CloudFlare
+  指纹: 8 个
+  [!] 安全问题: 3 个 (高危: 1)
+-------------------------------------------------------
 ```
 
-### 🤝 贡献
+---
 
-欢迎提交 Issue 和 Pull Request！
-
-### 📄 许可证
+## 📄 许可证
 
 [GPL-3.0 License](LICENSE)
 
 ---
-
-## English
-
-### 🎯 Introduction
-
-AutoRecon is a modular automated reconnaissance framework designed for security researchers and penetration testers. It supports subdomain enumeration, port scanning, fingerprinting, CDN detection, and more.
-
-### ✨ Features
-
-- 🔧 **Modular Architecture** - 10+ independent modules
-- 📊 **HTML Reports** - Auto-generated visual reports
-- 🎨 **Colored Logs** - Clear terminal output
-- ⚡ **Concurrent Execution** - Efficient async processing
-- 🔌 **Tool Integration** - Supports subfinder, nmap, httpx
-
-### 🚀 Quick Start
-
-```bash
-# Clone
-git clone https://github.com/zhang123999-qq/AutoRecon.git
-cd AutoRecon
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run
-python recon.py -d example.com
-```
-
-### 📄 License
-
-[GPL-3.0 License](LICENSE)
-
----
-
-<div align="center">
 
 **⭐ 如果这个项目对你有帮助，请给个 Star！**
 
 Made with ❤️ by [zhang123999-qq](https://github.com/zhang123999-qq)
-
-</div>
