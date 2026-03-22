@@ -390,21 +390,30 @@ class App {
      * 压力测试完成回调
      */
     onStressComplete(results) {
+        console.log('压力测试结果:', results);
+        
         const metrics = results.metrics || results;
         
         // 更新实时状态
-        document.getElementById('stressQps').textContent = metrics.throughput?.qps?.toFixed(1) || '0';
-        document.getElementById('stressAvgTime').textContent = metrics.response_time?.avg?.toFixed(0) || '0';
-        document.getElementById('stressErrorRate').textContent = (metrics.errors?.error_rate || 0).toFixed(1) + '%';
-        document.getElementById('stressLevel').textContent = metrics.stress_level || '-';
+        const qpsEl = document.getElementById('stressQps');
+        const avgTimeEl = document.getElementById('stressAvgTime');
+        const errorRateEl = document.getElementById('stressErrorRate');
+        const levelEl = document.getElementById('stressLevel');
+        
+        if (qpsEl) qpsEl.textContent = (metrics.throughput?.qps || 0).toFixed(1);
+        if (avgTimeEl) avgTimeEl.textContent = (metrics.response_time?.avg || 0).toFixed(0);
+        if (errorRateEl) errorRateEl.textContent = (metrics.errors?.error_rate || 0).toFixed(1) + '%';
+        if (levelEl) levelEl.textContent = metrics.stress_level || '-';
 
         // 显示详细结果
-        document.getElementById('stressResultsCard').style.display = 'block';
+        const resultsCard = document.getElementById('stressResultsCard');
+        if (resultsCard) resultsCard.style.display = 'block';
         renderStressResults(results, 'stressResultsContainer');
 
         // 显示瓶颈分析
         if (results.analysis) {
-            document.getElementById('stressAnalysisCard').style.display = 'block';
+            const analysisCard = document.getElementById('stressAnalysisCard');
+            if (analysisCard) analysisCard.style.display = 'block';
             renderAnalysis(results.analysis, 'stressAnalysisContainer');
         }
 
