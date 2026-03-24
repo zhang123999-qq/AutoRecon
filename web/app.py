@@ -750,19 +750,20 @@ async def create_stress_test(request: StressTestRequest, background_tasks: Backg
 
 
 async def run_stress_test_task(test_id: str, request: StressTestRequest):
-    """后台压力测试任务（带实时更新）"""
+    """后台压力测试任务（带实时更新，无上限支持）"""
     from modules.stress_test import StressTester, StressTestConfig
     
     try:
         stress_tasks[test_id].status = "running"
         stress_tasks[test_id].current_phase = "测试中"
         
-        # 创建配置
+        # 创建配置（无上限）
         config = StressTestConfig(
             target_url=request.url,
             concurrent_users=request.concurrent,
             duration=request.duration,
-            timeout=request.timeout if hasattr(request, 'timeout') else 30
+            timeout=request.timeout if hasattr(request, 'timeout') else 30,
+            max_concurrent=request.max_concurrent if hasattr(request, 'max_concurrent') else 10000
         )
         
         tester = StressTester(config)
@@ -824,13 +825,14 @@ async def list_stress_tests():
 
 @app.post("/api/stress/quick")
 async def quick_stress_test(request: StressTestRequest):
-    """快速压力测试 (同步，直接返回结果)"""
+    """快速压力测试 (同步，直接返回结果，无上限支持)"""
     try:
         result = await run_stress_test(
             url=request.url,
             mode="quick",
             concurrent=request.concurrent,
-            duration=request.duration
+            duration=request.duration,
+            max_concurrent=request.max_concurrent if hasattr(request, 'max_concurrent') else 10000
         )
         # 使用 JSONResponse 确保正确计算 Content-Length
         return JSONResponse(content=result)

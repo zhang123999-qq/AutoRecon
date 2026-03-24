@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # 主扫描服务
+  autorecon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: autorecon:3.1.0
+    container_name: autorecon-cli
+    volumes:
+      - ./reports:/app/reports
+      - ./cache:/app/cache
+      - ./config.py:/app/config.py:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: python recon_v3.py --help
+
+  # Web UI 服务
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: autorecon:3.1.0
+    container_name: autorecon-web
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./reports:/app/reports
+      - ./cache:/app/cache
+      - ./config.py:/app/config.py:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - HOST=0.0.0.0
+      - PORT=8000
+    command: python -m uvicorn web.app:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Redis 缓存（可选）
+  redis:
+    image: redis:7-alpine
+    container_name: autorecon-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    profiles:
+      - cache
+
+volumes:
+  redis_data:
+
+networks:
+  default:
+    name: autorecon-network

@@ -1,6 +1,6 @@
 /**
- * 压力测试模块
- * 处理网站压力测试相关功能
+ * 压力测试模块（优化版 v2）
+ * 处理网站压力测试相关功能，支持无上限配置和智能测试
  */
 
 export class StressTester {
@@ -17,7 +17,7 @@ export class StressTester {
     /**
      * 开始压力测试
      */
-    async start(url, mode, concurrent, duration) {
+    async start(url, mode, concurrent, duration, maxConcurrent = 10000) {
         if (!url) {
             throw new Error('请输入目标 URL');
         }
@@ -41,7 +41,8 @@ export class StressTester {
                 url,
                 mode,
                 concurrent,
-                duration
+                duration,
+                max_concurrent: maxConcurrent
             })
         });
 
@@ -62,7 +63,7 @@ export class StressTester {
     /**
      * 快速测试（同步返回）
      */
-    async quickTest(url, concurrent, duration) {
+    async quickTest(url, concurrent, duration, maxConcurrent = 10000) {
         if (!url) {
             throw new Error('请输入目标 URL');
         }
@@ -74,7 +75,8 @@ export class StressTester {
                 url,
                 mode: 'quick',
                 concurrent,
-                duration
+                duration,
+                max_concurrent: maxConcurrent
             })
         });
 
@@ -84,6 +86,76 @@ export class StressTester {
         }
 
         return await response.json();
+    }
+
+    /**
+     * 智能测试
+     */
+    async intelligentTest(url, maxConcurrent = 1000) {
+        if (!url) {
+            throw new Error('请输入目标 URL');
+        }
+
+        const response = await fetch('/api/stress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                url,
+                mode: 'intelligent',
+                concurrent: 10,
+                duration: 30,
+                max_concurrent: maxConcurrent
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.detail || '创建智能测试任务失败');
+        }
+
+        const data = await response.json();
+        this.currentTestId = data.test_id;
+        this.testCompleted = false;
+
+        return {
+            testId: data.test_id,
+            status: 'created'
+        };
+    }
+
+    /**
+     * 容量极限测试
+     */
+    async capacityTest(url, maxConcurrent = 1000) {
+        if (!url) {
+            throw new Error('请输入目标 URL');
+        }
+
+        const response = await fetch('/api/stress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                url,
+                mode: 'capacity',
+                concurrent: 10,
+                duration: 30,
+                max_concurrent: maxConcurrent
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.detail || '创建容量测试任务失败');
+        }
+
+        const data = await response.json();
+        this.currentTestId = data.test_id;
+        this.testCompleted = false;
+
+        return {
+            testId: data.test_id,
+            status: 'created'
+        };
     }
 
     /**
@@ -187,6 +259,18 @@ export function renderStressResults(results, containerId) {
         `;
     }
 
+    // 性能评分（如果有）
+    if (results.performance_score !== undefined) {
+        const scoreColor = results.performance_score >= 80 ? 'success' : 
+                          results.performance_score >= 60 ? 'primary' :
+                          results.performance_score >= 40 ? 'warning' : 'danger';
+        html += `
+            <div class="result-section">
+                <h6>性能评分: <span class="badge bg-${scoreColor}">${results.performance_score}/100</span></h6>
+            </div>
+        `;
+    }
+
     // 请求统计
     if (metrics.total_requests !== undefined) {
         html += `
@@ -284,11 +368,20 @@ export function renderAnalysis(analysis, containerId) {
     const container = document.getElementById(containerId);
     if (!container || !analysis) return;
 
+    const severityColors = {
+        'critical': 'danger',
+        'high': 'warning',
+        'medium': 'info',
+        'low': 'secondary'
+    };
+    const color = severityColors[analysis.severity] || 'secondary';
+
     let html = `
         <div class="result-section">
             <h6>
                 <i class="bi bi-search"></i> 瓶颈类型: 
                 <span class="badge bg-info">${analysis.bottleneck_type || '未知'}</span>
+                <span class="badge bg-${color} ms-1">${analysis.severity || 'low'}</span>
             </h6>
             <p class="mb-2">${analysis.description || ''}</p>
             <div class="small text-secondary">置信度: ${analysis.confidence || 0}%</div>
@@ -305,6 +398,152 @@ export function renderAnalysis(analysis, containerId) {
             </div>
         `;
     }
+
+    container.innerHTML = html;
+}
+
+/**
+ * 渲染容量测试结果
+ */
+export function renderCapacityResults(results, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container || !results) return;
+
+    let html = '';
+
+    // 摘要
+    if (results.summary) {
+        const s = results.summary;
+        html += `
+            <div class="result-section">
+                <h6><i class="bi bi-speedometer2"></i> 容量分析</h6>
+                <div class="row text-center">
+                    <div class="col-3">
+                        <div class="display-6 text-primary">${s.max_qps?.toFixed(0) || 0}</div>
+                        <small class="text-secondary">最大 QPS</small>
+                    </div>
+                    <div class="col-3">
+                        <div class="display-6 text-success">${s.optimal_concurrent || 0}</div>
+                        <small class="text-secondary">最优并发</small>
+                    </div>
+                    <div class="col-3">
+                        <div class="display-6 text-warning">${s.safe_concurrent || 0}</div>
+                        <small class="text-secondary">安全并发</small>
+                    </div>
+                    <div class="col-3">
+                        <div class="display-6 ${s.breaking_concurrent ? 'text-danger' : 'text-success'}">${s.breaking_concurrent || '未达到'}</div>
+                        <small class="text-secondary">崩溃点</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 容量曲线表格
+    if (results.capacity_curve && results.capacity_curve.length > 0) {
+        html += `
+            <div class="result-section">
+                <h6><i class="bi bi-graph-up"></i> 容量曲线</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>并发</th>
+                                <th>QPS</th>
+                                <th>响应时间</th>
+                                <th>错误率</th>
+                                <th>状态</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${results.capacity_curve.map(p => `
+                                <tr class="${p.is_breaking ? 'table-danger' : p.is_optimal ? 'table-success' : ''}">
+                                    <td>${p.concurrent}</td>
+                                    <td>${p.qps?.toFixed(1)}</td>
+                                    <td>${p.avg_time?.toFixed(0)} ms</td>
+                                    <td>${p.error_rate?.toFixed(1)}%</td>
+                                    <td>
+                                        ${p.is_optimal ? '<span class="badge bg-success">最优</span>' : ''}
+                                        ${p.is_breaking ? '<span class="badge bg-danger">崩溃</span>' : ''}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+
+    // 容量等级
+    if (results.capacity_level) {
+        const levelColors = {
+            '高容量': 'success',
+            '中等容量': 'primary',
+            '标准容量': 'info',
+            '低容量': 'warning',
+            '受限容量': 'danger'
+        };
+        html += `
+            <div class="result-section">
+                <h6>容量等级: <span class="badge bg-${levelColors[results.capacity_level] || 'secondary'}">${results.capacity_level}</span></h6>
+            </div>
+        `;
+    }
+
+    // 建议
+    if (results.recommendations && results.recommendations.length > 0) {
+        html += `
+            <div class="result-section">
+                <h6><i class="bi bi-lightbulb"></i> 建议</h6>
+                <ul class="mb-0">
+                    ${results.recommendations.map(r => `<li>${r}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    container.innerHTML = html || '<p class="text-secondary">暂无结果</p>';
+}
+
+/**
+ * 渲染负载测试结果
+ */
+export function renderLoadTestResults(loadTest, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container || !loadTest || loadTest.length === 0) return;
+
+    let html = `
+        <div class="result-section">
+            <h6><i class="bi bi-graph-up"></i> 负载测试结果</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>并发</th>
+                            <th>QPS</th>
+                            <th>平均响应</th>
+                            <th>P99</th>
+                            <th>错误率</th>
+                            <th>等级</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${loadTest.map(p => `
+                            <tr>
+                                <td>${p.concurrent}</td>
+                                <td>${p.qps?.toFixed(1)}</td>
+                                <td>${p.avg_time?.toFixed(0)} ms</td>
+                                <td>${p.p99_time?.toFixed(0)} ms</td>
+                                <td class="${p.error_rate > 10 ? 'text-danger' : ''}">${p.error_rate?.toFixed(1)}%</td>
+                                <td><span class="badge bg-secondary">${p.stress_level || '-'}</span></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
 
     container.innerHTML = html;
 }

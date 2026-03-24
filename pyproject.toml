@@ -1,0 +1,107 @@
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autorecon"
+version = "3.0.0"
+description = "异步信息收集框架 - 高性能安全侦察工具"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "GPL-3.0"}
+authors = [
+    {name = "zhang123999-qq"}
+]
+keywords = ["security", "reconnaissance", "subdomain", "vulnerability", "scanner"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Internet :: WWW/HTTP",
+    "Framework :: AsyncIO",
+    "Framework :: FastAPI",
+]
+
+dependencies = [
+    "aiohttp>=3.9.0",
+    "dnspython>=2.4.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=4.9.0",
+    "jinja2>=3.1.0",
+]
+
+[project.optional-dependencies]
+web = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "websockets>=12.0",
+]
+proxy = [
+    "aiohttp-socks>=0.8.0",
+]
+progress = [
+    "tqdm>=4.66.0",
+]
+screenshot = [
+    "playwright>=1.40.0",
+]
+sqlmap = [
+    "sqlmap>=1.7.0",
+]
+all = [
+    "autorecon[web,proxy,progress,screenshot,sqlmap]",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+    "mypy>=1.8.0",
+    "ruff>=0.2.0",
+]
+
+[project.scripts]
+autorecon = "recon_v3:main"
+
+[project.urls]
+Homepage = "https://github.com/zhang123999-qq/recon_tool"
+Repository = "https://github.com/zhang123999-qq/recon_tool"
+Documentation = "https://github.com/zhang123999-qq/recon_tool#readme"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["core*", "modules*", "data*"]
+
+[tool.black]
+line-length = 120
+target-version = ['py310']
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.ruff]
+line-length = 120
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+python_files = ["test_*.py"]

@@ -272,10 +272,16 @@ class App {
         const concurrentSlider = document.getElementById('stressConcurrent');
         
         if (concurrentInput && concurrentSlider) {
-            // 输入框变化时更新滑块
+            // 输入框变化时更新滑块（无上限）
             concurrentInput.addEventListener('input', (e) => {
-                const val = Math.min(200, Math.max(1, parseInt(e.target.value) || 1));
-                concurrentSlider.value = val;
+                const val = parseInt(e.target.value) || 1;
+                if (val > 0) {
+                    // 滑块最大值动态调整
+                    if (val > 10000) {
+                        concurrentSlider.max = val;
+                    }
+                    concurrentSlider.value = Math.min(val, parseInt(concurrentSlider.max));
+                }
             });
             
             // 滑块变化时更新输入框
@@ -290,8 +296,14 @@ class App {
         
         if (durationInput && durationSlider) {
             durationInput.addEventListener('input', (e) => {
-                const val = Math.min(120, Math.max(5, parseInt(e.target.value) || 10));
-                durationSlider.value = val;
+                const val = parseInt(e.target.value) || 10;
+                if (val > 0) {
+                    // 滑块最大值动态调整
+                    if (val > 3600) {
+                        durationSlider.max = val;
+                    }
+                    durationSlider.value = Math.min(val, parseInt(durationSlider.max));
+                }
             });
             
             durationSlider.addEventListener('input', (e) => {
@@ -325,14 +337,14 @@ class App {
             return;
         }
 
-        // 验证参数范围
-        if (concurrent < 1 || concurrent > 500) {
-            alert('并发数应在 1-500 之间');
+        // 基础参数验证（无上限，只检查是否为正数）
+        if (concurrent < 1) {
+            alert('并发数必须大于 0');
             return;
         }
         
-        if (duration < 1 || duration > 600) {
-            alert('持续时间应在 1-600 秒之间');
+        if (duration < 1) {
+            alert('持续时间必须大于 0');
             return;
         }
 

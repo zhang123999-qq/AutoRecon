@@ -35,13 +35,13 @@ logger = logging.getLogger(__name__)
 # ============ 常量配置 ============
 
 # 最大保留结果数（防止内存泄漏）
-MAX_RESULTS_COUNT = 10000
-MAX_RESPONSE_TIMES_COUNT = 50000
+MAX_RESULTS_COUNT = 100000
+MAX_RESPONSE_TIMES_COUNT = 500000
 
-# 默认配置
+# 默认配置（无上限设计，由用户和系统资源决定）
 DEFAULT_TIMEOUT = 30
-DEFAULT_MAX_CONCURRENT = 200
-DEFAULT_CONNECTOR_LIMIT = 1000
+DEFAULT_MAX_CONCURRENT = 10000
+DEFAULT_CONNECTOR_LIMIT = 50000
 
 # 重试配置
 MAX_RETRIES = 3
@@ -219,7 +219,7 @@ class TestMetrics:
 
 @dataclass
 class StressTestConfig:
-    """压力测试配置"""
+    """压力测试配置（无上限设计）"""
     target_url: str
     method: str = "GET"
     headers: Dict[str, str] = field(default_factory=lambda: {
@@ -227,10 +227,11 @@ class StressTestConfig:
     })
     body: Optional[str] = None
     
+    # 并发配置（无上限，由用户决定）
     concurrent_users: int = 10
-    max_concurrent: int = 200
+    max_concurrent: int = 10000  # 支持超高并发
     ramp_up_time: int = 5
-    duration: int = 10
+    duration: int = 10  # 无上限，可设置任意时长
     
     timeout: int = DEFAULT_TIMEOUT
     think_time: float = 0
