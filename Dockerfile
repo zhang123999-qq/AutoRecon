@@ -1,9 +1,9 @@
-# AutoRecon v3.1
-FROM python:3.11-slim
+# AutoRecon v3.2
+FROM python:3.12-slim
 
 LABEL maintainer="AutoRecon Team"
-LABEL version="3.1.0"
-LABEL description="异步信息收集框架"
+LABEL version="3.2.0"
+LABEL description="异步信息收集框架 - 高性能安全侦察工具"
 
 # 设置环境变量
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -29,7 +29,7 @@ COPY requirements.txt pyproject.toml ./
 # 安装 Python 依赖
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt || true && \
-    pip install aiohttp dnspython beautifulsoup4 lxml jinja2 aiohttp-socks tqdm
+    pip install aiohttp dnspython beautifulsoup4 lxml jinja2 aiohttp-socks tqdm pyyaml
 
 # 复制项目文件
 COPY . .

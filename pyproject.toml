@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "autorecon"
-version = "3.0.0"
+version = "3.2.0"
 description = "异步信息收集框架 - 高性能安全侦察工具"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -58,8 +58,11 @@ screenshot = [
 sqlmap = [
     "sqlmap>=1.7.0",
 ]
+scenario = [
+    "pyyaml>=6.0",
+]
 all = [
-    "autorecon[web,proxy,progress,screenshot,sqlmap]",
+    "autorecon[web,proxy,progress,screenshot,sqlmap,scenario]",
 ]
 dev = [
     "pytest>=8.0.0",

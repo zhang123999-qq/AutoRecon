@@ -6,7 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: autorecon:3.1.0
+    image: autorecon:3.2.0
     container_name: autorecon-cli
     volumes:
       - ./reports:/app/reports
@@ -21,7 +21,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: autorecon:3.1.0
+    image: autorecon:3.2.0
     container_name: autorecon-web
     ports:
       - "8000:8000"

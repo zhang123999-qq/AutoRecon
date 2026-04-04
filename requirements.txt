@@ -19,5 +19,8 @@ tqdm>=4.66.0
 # 可选：代理支持
 aiohttp-socks>=0.8.0
 
+# 可选：场景脚本
+pyyaml>=6.0
+
 # 可选：截图
 # playwright>=1.40.0
