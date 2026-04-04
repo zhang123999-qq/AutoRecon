@@ -1,22 +1,23 @@
-# 🔍 AutoRecon v3.0
+# 🔍 AutoRecon v3.2
 
 **异步信息收集框架 | Async Reconnaissance Framework**
 
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![Async](https://img.shields.io/badge/Async-aiohttp-green)](https://docs.aiohttp.org/)
 [![Web UI](https://img.shields.io/badge/Web_UI-FastAPI-orange)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/License-GPL%20v3-green.svg)](LICENSE)
 
 ---
 
-## ✨ v3.0 新特性
+## ✨ v3.2 新特性
 
 - 🚀 **异步架构** - 基于 asyncio，性能提升 10x+
 - 🌐 **Web UI** - 全新 Web 界面，实时查看扫描进度
 - 📊 **HTML 报告** - 自动生成可视化扫描报告
 - 🔒 **漏洞扫描** - 检测敏感文件泄露、SQL注入、XSS等
-- 💉 **SQLMap 集成** - 专业 SQL 注入检测（集成 sqlmap）
-- 📈 **压力测试** - 网站性能压测、抗压等级评估（新增）
+- 💉 **SQLMap 集成** - 专业 SQL 注入检测
+- 📈 **高级压力测试** - 阶梯测试、浸泡测试、峰值测试、场景脚本
+- 🔌 **WebSocket 实时推送** - 实时进度广播
 - 📚 **扩展字典** - 5000+ 子域名前缀，200+ 指纹
 - 💾 **智能缓存** - DNS 和 HTTP 结果缓存
 
@@ -33,7 +34,10 @@
 | `sensitive` | 敏感信息检测 | ✅ |
 | `vuln` | 漏洞扫描 | ✅ |
 | `sqli` | SQLMap 注入扫描 | ✅ |
-| `stress` | 压力测试 | ✅ 新增 |
+| `stress` | 压力测试 | ✅ |
+| `stress_realtime` | WebSocket 实时推送 | ✅ 新增 |
+| `stress_scenario` | 场景脚本 | ✅ 新增 |
+| `stress_modes` | 高级测试模式 | ✅ 新增 |
 
 ---
 
