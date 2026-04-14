@@ -2,6 +2,91 @@
 
 所有重要的更改都将记录在此文件中。
 
+## [3.3.0] - 2026-04-14
+
+### 安全加固 🔒
+
+#### P0 - 关键安全修复
+| 修复项 | 说明 |
+|--------|------|
+| 免责声明 | 启动时显示法律声明和授权确认 |
+| `--yes` 参数 | 跳过授权确认（自动化场景） |
+| 命令注入防护 | `validate_url()`, `validate_parameter()` 函数 |
+| SSRF 防护 | IPv4/IPv6 黑名单 + DNS 检查，防止内网探测 |
+| Web API 认证 | Bearer Token 认证，支持多 API Key |
+
+#### P1 - 功能增强
+| 功能 | 说明 |
+|------|------|
+| 测试覆盖 | 48 个测试用例全部通过 |
+| 速率限制 | `MAX_RATE=100`, `MAX_BURST=200` 防止滥用 |
+| 日志脱敏 | `sanitize_message()` 自动过滤敏感信息 |
+| Pre-commit Hooks | 代码提交前自动检查 |
+
+#### P2 - 架构优化
+| 优化项 | 说明 |
+|--------|------|
+| 配置重构 | dataclass + 环境变量，支持 `.env` 文件 |
+| 类型注解 | `py.typed` + `mypy.ini`，支持静态类型检查 |
+| IPv6 Bug 修复 | `validate_target()` 正确处理 IPv6 地址格式 |
+| validators 可选 | 内置 fallback 验证函数，减少依赖 |
+
+#### P3 - 文档完善
+| 文档 | 说明 |
+|------|------|
+| `SECURITY.md` | 安全策略和漏洞报告指南 |
+| `CONTRIBUTING.md` | 贡献指南和开发规范 |
+| `SECURITY_BEST_PRACTICES.md` | 安全最佳实践文档 |
+| `.env.example` | 环境变量配置示例 |
+
+### Web UI 改进 🌐
+
+| 改进 | 说明 |
+|------|------|
+| Bootstrap 本地化 | 无需 CDN，离线可用 |
+| CORS 配置修复 | 正确处理跨域请求 |
+| 字体路径修复 | Bootstrap Icons 本地化 |
+
+### 新增文件
+```
+├── .env.example              # 环境变量示例
+├── .pre-commit-config.yaml   # Pre-commit Hooks
+├── SECURITY.md               # 安全文档
+├── CONTRIBUTING.md           # 贡献指南
+├── mypy.ini                  # MyPy 配置
+├── py.typed                  # 类型标记
+├── pytest.ini                # Pytest 配置
+├── requirements-dev.txt      # 开发依赖
+├── docs/SECURITY_BEST_PRACTICES.md
+├── tests/test_async_engine.py
+├── tests/test_input_validation.py
+├── tests/test_ssrf_protection.py
+├── tests/test_web_api.py
+└── web/static/vendor/        # Bootstrap 本地资源
+```
+
+### 安全黑名单
+
+**IPv4 黑名单 (8 个网段):**
+- `127.0.0.0/8` - 本地回环
+- `10.0.0.0/8` - 私有网络 A
+- `172.16.0.0/12` - 私有网络 B
+- `192.168.0.0/16` - 私有网络 C
+- `169.254.0.0/16` - 链路本地
+- `0.0.0.0/8` - 当前网络
+- `224.0.0.0/4` - 组播地址
+- `240.0.0.0/4` - 保留地址
+
+**IPv6 黑名单 (6 个网段):**
+- `::1/128` - 本地回环
+- `fc00::/7` - 唯一本地地址
+- `fe80::/10` - 链路本地
+- `ff00::/8` - 组播地址
+- `::/128` - 未指定地址
+- `::ffff:0:0/96` - IPv4 映射地址
+
+---
+
 ## [3.2.0] - 2026-04-04
 
 ### 新增功能 ✨

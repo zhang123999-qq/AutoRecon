@@ -1,10 +1,11 @@
-# 🔍 AutoRecon v3.2
+# 🔍 AutoRecon v3.3
 
 **异步信息收集框架 | Async Reconnaissance Framework**
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![Async](https://img.shields.io/badge/Async-aiohttp-green)](https://docs.aiohttp.org/)
 [![Web UI](https://img.shields.io/badge/Web_UI-FastAPI-orange)](https://fastapi.tiangolo.com/)
+[![Security](https://img.shields.io/badge/Security-Hardened-red)](SECURITY.md)
 [![License](https://img.shields.io/badge/License-GPL%20v3-green.svg)](LICENSE)
 
 ---
@@ -26,17 +27,29 @@
 
 ---
 
-## ✨ v3.2 新特性
+## ✨ v3.3 新特性
 
-- 🚀 **异步架构** - 基于 asyncio，性能提升 10x+
-- 🌐 **Web UI** - 全新 Web 界面，实时查看扫描进度
-- 📊 **HTML 报告** - 自动生成可视化扫描报告
-- 🔒 **漏洞扫描** - 检测敏感文件泄露、SQL注入、XSS等
-- 💉 **SQLMap 集成** - 专业 SQL 注入检测
-- 📈 **高级压力测试** - 阶梯测试、浸泡测试、峰值测试、场景脚本
-- 🔌 **WebSocket 实时推送** - 实时进度广播
-- 📚 **扩展字典** - 5000+ 子域名前缀，200+ 指纹
-- 💾 **智能缓存** - DNS 和 HTTP 结果缓存
+### 🔒 安全加固
+- **免责声明** - 启动时显示法律声明，要求用户确认授权
+- **命令注入防护** - 输入验证函数，防止命令执行漏洞
+- **SSRF 防护** - IPv4/IPv6 黑名单 + DNS 检查，防止内网探测
+- **API 认证** - Bearer Token 认证，支持多 API Key
+- **速率限制** - 防止滥用，保护目标服务器
+- **日志脱敏** - 自动过滤敏感信息
+
+### 🧪 质量保证
+- **48 个测试用例** - 核心功能全覆盖
+- **类型注解** - 支持 MyPy 静态检查
+- **Pre-commit Hooks** - 提交前自动检查代码
+
+### 🌐 Web UI
+- **Bootstrap 本地化** - 无需 CDN，离线可用
+- **CORS 修复** - 正确处理跨域请求
+
+### 📚 文档
+- `SECURITY.md` - 安全策略
+- `CONTRIBUTING.md` - 贡献指南
+- `docs/SECURITY_BEST_PRACTICES.md` - 安全最佳实践
 
 ---
 
@@ -52,9 +65,9 @@
 | `vuln` | 漏洞扫描 | ✅ |
 | `sqli` | SQLMap 注入扫描 | ✅ |
 | `stress` | 压力测试 | ✅ |
-| `stress_realtime` | WebSocket 实时推送 | ✅ 新增 |
-| `stress_scenario` | 场景脚本 | ✅ 新增 |
-| `stress_modes` | 高级测试模式 | ✅ 新增 |
+| `stress_realtime` | WebSocket 实时推送 | ✅ |
+| `stress_scenario` | 场景脚本 | ✅ |
+| `stress_modes` | 高级测试模式 | ✅ |
 
 ---
 
