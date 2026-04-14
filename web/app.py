@@ -18,10 +18,11 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
 # 导入核心组件
@@ -56,14 +57,62 @@ app = FastAPI(
     version="3.0.0"
 )
 
-# CORS
+# CORS 配置 - 开发模式允许所有来源
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"] if ALLOWED_ORIGINS == "*" else ALLOWED_ORIGINS.split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ============ API 认证配置 ============
+
+security = HTTPBearer(auto_error=False)
+
+# 从环境变量读取 API Keys（生产环境必须设置）
+# 示例: export API_KEYS="key1,key2,key3"
+API_KEYS = os.environ.get("API_KEYS", "").split(",") if os.environ.get("API_KEYS") else []
+
+# 是否启用认证（生产环境默认启用，开发环境可禁用）
+AUTH_ENABLED = os.environ.get("AUTH_ENABLED", "false").lower() == "true"
+
+
+def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    """
+    验证 API Key
+    
+    生产环境使用方法:
+    1. 设置环境变量: export API_KEYS="your-secret-key-1,your-secret-key-2"
+    2. 启用认证: export AUTH_ENABLED="true"
+    3. 请求时添加 Header: Authorization: Bearer your-secret-key-1
+    """
+    if not AUTH_ENABLED:
+        # 开发环境不启用认证
+        return "dev-mode"
+    
+    if not API_KEYS:
+        # 未配置 API Keys，拒绝所有请求
+        raise HTTPException(
+            status_code=500,
+            detail="API 认证未配置。请联系管理员设置 API_KEYS 环境变量。"
+        )
+    
+    if not credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="缺少认证信息。请在 Header 中添加 Authorization: Bearer <api-key>"
+        )
+    
+    if credentials.credentials not in API_KEYS:
+        raise HTTPException(
+            status_code=401,
+            detail="无效的 API Key"
+        )
+    
+    return credentials.credentials
 
 # 扫描任务存储
 scan_tasks: Dict[str, ScanStatus] = {}
@@ -83,8 +132,10 @@ def cleanup_expired_tasks():
                 created = datetime.strptime(task.created_at, "%Y-%m-%d %H:%M:%S")
                 if (now - created).total_seconds() > TASK_EXPIRY_SECONDS:
                     expired.append(scan_id)
-            except:
-                pass
+            except ValueError as e:
+                logger.warning(f"Failed to parse task time: {e}")
+            except Exception as e:
+                logger.warning(f"Failed to cleanup task {scan_id}: {e}")
     
     for scan_id in expired:
         del scan_tasks[scan_id]
@@ -114,7 +165,10 @@ class ConnectionManager:
             for connection in self.active_connections[scan_id][:]:
                 try:
                     await connection.send_json(message)
-                except:
+                except WebSocketDisconnect:
+                    self.disconnect(connection, scan_id)
+                except Exception as e:
+                    logger.warning(f"WebSocket broadcast failed: {e}")
                     self.disconnect(connection, scan_id)
 
 manager = ConnectionManager()
@@ -220,7 +274,10 @@ class WebScanRunner:
                 writer.close()
                 await writer.wait_closed()
                 return (port, True)
-            except:
+            except (asyncio.TimeoutError, ConnectionRefusedError, ConnectionResetError):
+                return (port, False)
+            except Exception as e:
+                logger.debug(f"Port scan error for {host}:{port}: {e}")
                 return (port, False)
         
         for host in hosts[:10]:
@@ -490,18 +547,25 @@ async def run_scan_task(scan_id: str, request: ScanRequest):
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    """主页"""
-    html_file = Path(__file__).parent / "templates" / "index.html"
-    return HTMLResponse(content=html_file.read_text(encoding='utf-8'))
+    """主页 - 稳健读取版"""
+    # 确保路径正确
+    html_path = Path(__file__).parent / "templates" / "index.html"
+    if not html_path.exists():
+        return HTMLResponse(content="<h1>未找到 templates/index.html 文件，请检查路径</h1>", status_code=404)
+    
+    # 显式使用 utf-8 读取，防止中文乱码导致 Content-Length 计算错误
+    content = html_path.read_text(encoding='utf-8')
+    return HTMLResponse(content=content)
 
-
+from fastapi import Response
 @app.get("/favicon.ico")
 async def favicon():
     """返回空 favicon 避免控制台报错"""
-    return JSONResponse(content={}, status_code=204)
+# 直接返回 204 状态码，不带任何 content
+    return Response(status_code=204)
 
 
-@app.post("/api/scan")
+@app.post("/api/scan", dependencies=[Depends(verify_api_key)])
 async def create_scan(request: ScanRequest, background_tasks: BackgroundTasks):
     """创建扫描任务"""
     # 清理过期任务
@@ -526,7 +590,7 @@ async def create_scan(request: ScanRequest, background_tasks: BackgroundTasks):
     return {"scan_id": scan_id, "status": "created"}
 
 
-@app.delete("/api/scan/{scan_id}")
+@app.delete("/api/scan/{scan_id}", dependencies=[Depends(verify_api_key)])
 async def cancel_scan(scan_id: str):
     """取消扫描任务"""
     if scan_id not in scan_tasks:
@@ -586,8 +650,10 @@ async def list_reports():
                 "scan_time": data.get("scan_time", ""),
                 "size": f.stat().st_size
             })
-        except:
-            pass
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse report {f.name}: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to read report {f.name}: {e}")
     
     return sorted(reports, key=lambda x: x["scan_time"], reverse=True)
 
@@ -595,7 +661,22 @@ async def list_reports():
 @app.get("/api/reports/{filename}")
 async def get_report(filename: str):
     """获取报告详情"""
+    # 安全检查：防止路径遍历攻击
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    # 只允许 .json 文件
+    if not filename.endswith('.json'):
+        raise HTTPException(status_code=400, detail="Only JSON files are allowed")
+    
     report_file = ROOT_DIR / "reports" / filename
+    
+    # 验证文件是否在 reports 目录内
+    try:
+        report_file.resolve().relative_to((ROOT_DIR / "reports").resolve())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    
     if not report_file.exists():
         raise HTTPException(status_code=404, detail="Report not found")
     
@@ -605,7 +686,22 @@ async def get_report(filename: str):
 @app.get("/api/download/{filename}")
 async def download_report(filename: str):
     """下载报告"""
+    # 安全检查：防止路径遍历攻击
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    # 只允许 .json 文件
+    if not filename.endswith('.json'):
+        raise HTTPException(status_code=400, detail="Only JSON files are allowed")
+    
     report_file = ROOT_DIR / "reports" / filename
+    
+    # 验证文件是否在 reports 目录内
+    try:
+        report_file.resolve().relative_to((ROOT_DIR / "reports").resolve())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    
     if not report_file.exists():
         raise HTTPException(status_code=404, detail="Report not found")
     
@@ -629,7 +725,7 @@ async def websocket_endpoint(websocket: WebSocket, scan_id: str):
         manager.disconnect(websocket, scan_id)
 
 
-@app.post("/api/sqlmap")
+@app.post("/api/sqlmap", dependencies=[Depends(verify_api_key)])
 async def sqlmap_scan(request: dict):
     """
     单独的 sqlmap 扫描接口
@@ -724,7 +820,7 @@ def cleanup_expired_stress_tasks():
     return len(expired[:10])
 
 
-@app.post("/api/stress")
+@app.post("/api/stress", dependencies=[Depends(verify_api_key)])
 async def create_stress_test(request: StressTestRequest, background_tasks: BackgroundTasks):
     """创建压力测试任务"""
     # 清理过期任务

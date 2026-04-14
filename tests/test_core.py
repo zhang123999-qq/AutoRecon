@@ -30,30 +30,30 @@ class TestSQLiteCache:
     async def test_set_and_get(self, cache):
         """测试设置和获取"""
         # 设置
-        result = await cache.set("test_key", {"data": "test_value"})
+        result = cache.set("test_key", {"data": "test_value"})
         assert result is True
         
         # 获取
-        value = await cache.get("test_key")
+        value = cache.get("test_key")
         assert value == {"data": "test_value"}
     
     @pytest.mark.asyncio
     async def test_delete(self, cache):
         """测试删除"""
-        await cache.set("test_key", "test_value")
+        cache.set("test_key", "test_value")
         
         # 删除
         result = await cache.delete("test_key")
         assert result is True
         
         # 验证删除
-        value = await cache.get("test_key")
+        value = cache.get("test_key")
         assert value is None
     
     @pytest.mark.asyncio
     async def test_exists(self, cache):
         """测试存在性检查"""
-        await cache.set("test_key", "test_value")
+        cache.set("test_key", "test_value")
         
         assert await cache.exists("test_key") is True
         assert await cache.exists("nonexistent") is False
@@ -61,36 +61,36 @@ class TestSQLiteCache:
     @pytest.mark.asyncio
     async def test_clear(self, cache):
         """测试清空"""
-        await cache.set("key1", "value1")
-        await cache.set("key2", "value2")
+        cache.set("key1", "value1")
+        cache.set("key2", "value2")
         
         await cache.clear()
         
-        assert await cache.get("key1") is None
-        assert await cache.get("key2") is None
+        assert cache.get("key1") is None
+        assert cache.get("key2") is None
     
     @pytest.mark.asyncio
     async def test_ttl_expiry(self, cache):
         """测试过期"""
         # 设置 1 秒过期
-        await cache.set("test_key", "test_value", ttl=1)
+        cache.set("test_key", "test_value", ttl=1)
         
         # 立即获取应该有值
-        value = await cache.get("test_key")
+        value = cache.get("test_key")
         assert value == "test_value"
         
         # 等待过期
         await asyncio.sleep(1.5)
         
         # 过期后应该无值
-        value = await cache.get("test_key")
+        value = cache.get("test_key")
         assert value is None
     
     @pytest.mark.asyncio
     async def test_get_stats(self, cache):
         """测试统计"""
-        await cache.set("key1", "value1")
-        await cache.set("key2", "value2")
+        cache.set("key1", "value1")
+        cache.set("key2", "value2")
         
         stats = await cache.get_stats()
         

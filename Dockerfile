@@ -28,7 +28,7 @@ COPY requirements.txt pyproject.toml ./
 
 # 安装 Python 依赖
 RUN pip install --upgrade pip && \
-    pip install -r requirements.txt || true && \
+    pip install -r requirements.txt && \
     pip install aiohttp dnspython beautifulsoup4 lxml jinja2 aiohttp-socks tqdm pyyaml
 
 # 复制项目文件

@@ -13,6 +13,8 @@ import hashlib
 import json
 import os
 import ssl
+import ipaddress
+import urllib.parse
 from typing import List, Dict, Optional, Any, Callable
 from dataclasses import dataclass, field
 from functools import wraps
@@ -32,7 +34,7 @@ class AsyncCache:
     def _hash_key(self, key: str) -> str:
         return hashlib.md5(key.encode()).hexdigest()
     
-    async def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Optional[Any]:
         hkey = self._hash_key(key)
         if hkey in self.cache:
             value, expire = self.cache[hkey]
@@ -41,7 +43,7 @@ class AsyncCache:
             del self.cache[hkey]
         return None
     
-    async def set(self, key: str, value: Any, ttl: int = None):
+    def set(self, key: str, value: Any, ttl: int = None):
         if len(self.cache) >= self.max_size:
             # 清理过期缓存
             now = time.time()
@@ -130,8 +132,11 @@ class ProxyPool:
                     proxy.latency = time.time() - start
                     proxy.alive = True
                     proxy.fail_count = 0
-        except:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ConnectionError):
             proxy.alive = False
+        except Exception as e:
+            proxy.alive = False
+            logger.warning(f"Proxy check failed: {e}")
 
 
 # ============== 智能重试 ==============
@@ -181,12 +186,20 @@ def async_retry(config: RetryConfig = None):
 # ============== 速率限制 ==============
 
 class AsyncRateLimiter:
-    """异步速率限制器"""
+    """异步速率限制器
+    
+    安全限制：防止对目标造成 DoS 攻击
+    """
+    
+    # 安全上限
+    MAX_RATE = 100  # 最大 100 请求/秒
+    MAX_BURST = 200  # 最大突发 200 请求
     
     def __init__(self, rate: float = 10.0, burst: int = 20):
-        self.rate = rate  # 请求/秒
-        self.burst = burst
-        self.tokens = burst
+        # 强制限制在安全范围内
+        self.rate = min(rate, self.MAX_RATE)  # 请求/秒
+        self.burst = min(burst, self.MAX_BURST)
+        self.tokens = self.burst
         self.last_update = time.time()
         self.lock = asyncio.Lock()
     
@@ -229,7 +242,7 @@ class AsyncDNSResolver:
         cache_key = f"dns:{record_type}:{domain}"
         
         # 检查缓存
-        cached = await self.cache.get(cache_key)
+        cached = self.cache.get(cache_key)
         if cached is not None:
             return cached
         
@@ -237,9 +250,16 @@ class AsyncDNSResolver:
         try:
             answers = await self.resolver.resolve(domain, record_type)
             result = [str(r) for r in answers]
-            await self.cache.set(cache_key, result)
+            self.cache.set(cache_key, result)
             return result
-        except:
+        except dns.resolver.NXDOMAIN:
+            return []
+        except dns.resolver.NoAnswer:
+            return []
+        except dns.resolver.Timeout:
+            return []
+        except Exception as e:
+            logger.warning(f"DNS resolution failed for {domain}: {e}")
             return []
     
     async def resolve_all(self, domain: str) -> List[str]:
@@ -260,6 +280,56 @@ class AsyncDNSResolver:
 
 # ============== HTTP 客户端 ==============
 
+# SSRF 防护 - 禁止访问的内网 IP 段
+BLOCKED_IP_RANGES = [
+    ipaddress.ip_network('10.0.0.0/8'),       # 私有网络 A 类
+    ipaddress.ip_network('172.16.0.0/12'),    # 私有网络 B 类
+    ipaddress.ip_network('192.168.0.0/16'),   # 私有网络 C 类
+    ipaddress.ip_network('127.0.0.0/8'),      # 本地回环 (IPv4)
+    ipaddress.ip_network('169.254.0.0/16'),   # 链路本地
+    ipaddress.ip_network('0.0.0.0/8'),        # 当前网络
+    ipaddress.ip_network('224.0.0.0/4'),      # 多播地址
+    ipaddress.ip_network('240.0.0.0/4'),      # 保留地址
+]
+
+# IPv6 禁止地址
+BLOCKED_IPV6_RANGES = [
+    ipaddress.ip_network('::1/128'),          # IPv6 本地回环
+    ipaddress.ip_network('fc00::/7'),         # IPv6 唯一本地地址 (ULA)
+    ipaddress.ip_network('fe80::/10'),        # IPv6 链路本地
+    ipaddress.ip_network('ff00::/8'),         # IPv6 多播
+    ipaddress.ip_network('::/128'),           # 未指定地址
+    ipaddress.ip_network('::ffff:0:0/96'),    # IPv4 映射地址
+]
+
+
+def is_ip_blocked(ip_str: str) -> bool:
+    """检查 IP 是否在禁止访问的范围内"""
+    try:
+        ip_obj = ipaddress.ip_address(ip_str)
+        
+        # IPv4 检查
+        if ip_obj.version == 4:
+            for network in BLOCKED_IP_RANGES:
+                if ip_obj in network:
+                    return True
+        
+        # IPv6 检查
+        else:
+            for network in BLOCKED_IPV6_RANGES:
+                if ip_obj in network:
+                    return True
+            # 也检查 IPv4 映射的 IPv6 地址
+            if ip_obj.ipv4_mapped:
+                for network in BLOCKED_IP_RANGES:
+                    if ip_obj.ipv4_mapped in network:
+                        return True
+        
+        return False
+    except ValueError:
+        return True  # 无效 IP 也阻止
+
+
 class AsyncHTTPClient:
     """异步HTTP客户端"""
     
@@ -270,6 +340,7 @@ class AsyncHTTPClient:
         proxy_pool: ProxyPool = None,
         rate_limiter: AsyncRateLimiter = None,
         cache: AsyncCache = None,
+        verify_ssl: bool = True,  # 默认启用 SSL 验证
     ):
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.headers = headers or {
@@ -278,13 +349,18 @@ class AsyncHTTPClient:
         self.proxy_pool = proxy_pool
         self.rate_limiter = rate_limiter
         self.cache = cache
+        self.verify_ssl = verify_ssl
         self.session: Optional[aiohttp.ClientSession] = None
     
     async def __aenter__(self):
-        # 创建不验证 SSL 的连接器（解决某些 API 证书问题）
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
+        # 根据配置决定是否验证 SSL
+        if self.verify_ssl:
+            ssl_context = ssl.create_default_context()
+        else:
+            # 仅在明确禁用时才跳过验证
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
         
         connector = aiohttp.TCPConnector(
             limit=100, 
@@ -303,12 +379,65 @@ class AsyncHTTPClient:
         if self.session:
             await self.session.close()
     
+    async def _check_ssrf(self, url: str) -> None:
+        """
+        SSRF 防护检查
+        在发送请求前验证目标 IP 不在禁止范围内
+        """
+        try:
+            parsed = urllib.parse.urlparse(url)
+            hostname = parsed.hostname
+            
+            if not hostname:
+                raise ValueError(f"无法解析 URL 主机名: {url}")
+            
+            # 如果是 IP 地址直接检查
+            try:
+                ip = ipaddress.ip_address(hostname)
+                if is_ip_blocked(str(ip)):
+                    raise ValueError(
+                        f"SSRF 防护: 禁止访问内网地址 {ip}。"
+                        f"如需扫描内网，请在配置中明确启用。"
+                    )
+                return
+            except ValueError:
+                pass  # 不是 IP，继续解析域名
+            
+            # 解析域名获取 IP
+            try:
+                resolver = dns.asyncresolver.Resolver()
+                resolver.timeout = 3
+                resolver.lifetime = 5
+                answers = await resolver.resolve(hostname, 'A')
+                
+                for rdata in answers:
+                    ip_str = str(rdata)
+                    if is_ip_blocked(ip_str):
+                        raise ValueError(
+                            f"SSRF 防护: 域名 {hostname} 解析到内网 IP {ip_str}"
+                        )
+            except dns.resolver.NXDOMAIN:
+                pass  # 域名不存在，让后续请求处理
+            except dns.resolver.Timeout:
+                pass  # DNS 超时，让后续请求处理
+            except Exception:
+                pass  # 其他 DNS 错误，让后续请求处理
+                
+        except Exception as e:
+            if "SSRF 防护" in str(e):
+                raise
+            # 其他错误不阻止请求，记录警告即可
+    
     @async_retry()
-    async def get(self, url: str, **kwargs) -> Dict[str, Any]:
+    async def get(self, url: str, skip_ssrf_check: bool = False, **kwargs) -> Dict[str, Any]:
         """GET请求"""
+        # SSRF 防护检查
+        if not skip_ssrf_check:
+            await self._check_ssrf(url)
+        
         # 检查缓存
         if self.cache:
-            cached = await self.cache.get(f"http:get:{url}")
+            cached = self.cache.get(f"http:get:{url}")
             if cached:
                 return cached
         
@@ -334,7 +463,7 @@ class AsyncHTTPClient:
                 
                 # 缓存结果
                 if self.cache and resp.status == 200:
-                    await self.cache.set(f"http:get:{url}", result, ttl=300)
+                    self.cache.set(f"http:get:{url}", result, ttl=300)
                 
                 # 标记代理成功
                 if proxy:
@@ -347,8 +476,12 @@ class AsyncHTTPClient:
             raise
     
     @async_retry()
-    async def post(self, url: str, data: Any = None, json: Any = None, **kwargs) -> Dict[str, Any]:
+    async def post(self, url: str, data: Any = None, json: Any = None, skip_ssrf_check: bool = False, **kwargs) -> Dict[str, Any]:
         """POST请求"""
+        # SSRF 防护检查
+        if not skip_ssrf_check:
+            await self._check_ssrf(url)
+        
         if self.rate_limiter:
             await self.rate_limiter.acquire()
         
@@ -389,12 +522,17 @@ class AsyncProgressBar:
     
     async def _render(self):
         elapsed = time.time() - self.start_time
-        percent = self.current / self.total * 100
-        speed = self.current / elapsed if elapsed > 0 else 0
-        eta = (self.total - self.current) / speed if speed > 0 else 0
+        if self.total == 0:
+            percent = 0
+            speed = 0
+            eta = 0
+        else:
+            percent = self.current / self.total * 100
+            speed = self.current / elapsed if elapsed > 0 else 0
+            eta = (self.total - self.current) / speed if speed > 0 else 0
         
         bar_len = 30
-        filled = int(bar_len * self.current / self.total)
+        filled = int(bar_len * self.current / self.total) if self.total > 0 else 0
         bar = "█" * filled + "░" * (bar_len - filled)
         
         print(f"\r{self.desc}: [{bar}] {self.current}/{self.total} ({percent:.1f}%) | {speed:.1f}/s | ETA: {eta:.0f}s", end="", flush=True)

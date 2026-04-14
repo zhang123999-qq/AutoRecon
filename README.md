@@ -9,6 +9,23 @@
 
 ---
 
+## ⚠️ 安全警告 / DISCLAIMER
+
+**本工具仅供授权的安全测试使用！**
+
+未经授权对第三方系统进行扫描属于违法行为，可能违反：
+- 中国《网络安全法》、《刑法》第285-287条
+- 其他国家/地区的计算机犯罪相关法律
+
+使用者必须确保：
+1. ✅ 已获得目标系统所有者的**书面授权**
+2. ✅ 扫描目的仅为安全评估或渗透测试
+3. ✅ 了解并愿意承担法律责任
+
+**作者不对任何滥用行为承担责任。**
+
+---
+
 ## ✨ v3.2 新特性
 
 - 🚀 **异步架构** - 基于 asyncio，性能提升 10x+
@@ -216,6 +233,61 @@ recon_tool/
 | `/api/stress/quick` | POST | 快速压力测试 |
 | `/api/sqlmap` | POST | SQLMap 扫描 |
 | `/ws/{scan_id}` | WebSocket | 实时进度 |
+
+---
+
+## 🔒 安全特性
+
+### 内置安全防护
+
+AutoRecon v3.2 内置多项安全防护措施：
+
+| 特性 | 说明 |
+|------|------|
+| **SSRF 防护** | 自动阻止对内网 IP 的请求（可配置跳过） |
+| **命令注入防护** | URL/参数输入严格验证，过滤危险字符 |
+| **速率限制** | 最大 100 req/s，防止对目标造成 DoS |
+| **日志脱敏** | 自动过滤密码、Token 等敏感信息 |
+| **API 认证** | 支持 Bearer Token 认证 |
+
+### 环境变量配置
+
+复制 `.env.example` 为 `.env` 进行配置：
+
+```bash
+# 启用 API 认证（生产环境必须）
+AUTH_ENABLED=true
+API_KEYS=your-secret-key-1,your-secret-key-2
+
+# SSRF 防护（默认启用）
+SSRF_PROTECTION=true
+
+# 内网扫描（危险！仅用于授权内网测试）
+ALLOW_PRIVATE_IPS=false
+
+# 速率限制
+MAX_RATE=100
+MAX_BURST=200
+```
+
+### API 认证
+
+生产环境启用认证后，请求需携带 Token：
+
+```bash
+curl -H "Authorization: Bearer your-secret-key" \
+     -X POST http://localhost:5000/api/scan \
+     -H "Content-Type: application/json" \
+     -d '{"target": "example.com"}'
+```
+
+### 跳过授权确认
+
+自动化脚本场景，使用 `--yes` 参数：
+
+```bash
+python recon_v3.py example.com --yes
+```
 
 ---
 

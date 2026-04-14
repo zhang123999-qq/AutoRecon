@@ -1,71 +1,135 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-信息收集自动化工具 - 配置文件
+AutoRecon v3.0 - 配置管理
+
+支持环境变量覆盖，便于容器化和生产环境部署
 """
 
 import os
+from dataclasses import dataclass, field
+from typing import List, Dict, Optional
 
-# 基础配置
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_DIR = os.path.join(BASE_DIR, "reports")
 
-# 扫描配置
-CONFIG = {
-    # 超时设置
-    "timeout": 30,
-    "connect_timeout": 5,
-    "read_timeout": 10,
+def _get_env_list(key: str, default: str = "") -> List[str]:
+    """从环境变量读取列表（逗号分隔）"""
+    value = os.environ.get(key, default)
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _get_env_int(key: str, default: int) -> int:
+    """从环境变量读取整数"""
+    try:
+        return int(os.environ.get(key, str(default)))
+    except ValueError:
+        return default
+
+
+def _get_env_float(key: str, default: float) -> float:
+    """从环境变量读取浮点数"""
+    try:
+        return float(os.environ.get(key, str(default)))
+    except ValueError:
+        return default
+
+
+def _get_env_bool(key: str, default: bool) -> bool:
+    """从环境变量读取布尔值"""
+    value = os.environ.get(key, str(default)).lower()
+    return value in ("true", "1", "yes", "on")
+
+
+@dataclass
+class TimeoutConfig:
+    """超时配置"""
+    total: int = field(default_factory=lambda: _get_env_int("TIMEOUT_TOTAL", 30))
+    connect: int = field(default_factory=lambda: _get_env_int("TIMEOUT_CONNECT", 5))
+    read: int = field(default_factory=lambda: _get_env_int("TIMEOUT_READ", 10))
+    dns: int = field(default_factory=lambda: _get_env_int("TIMEOUT_DNS", 3))
+
+
+@dataclass
+class ThreadingConfig:
+    """并发配置"""
+    max_threads: int = field(default_factory=lambda: min(_get_env_int("MAX_THREADS", 200), 200))
+    subdomain_threads: int = field(default_factory=lambda: _get_env_int("SUBDOMAIN_THREADS", 50))
+    port_threads: int = field(default_factory=lambda: _get_env_int("PORT_THREADS", 100))
+    dir_threads: int = field(default_factory=lambda: _get_env_int("DIR_THREADS", 20))
+
+
+@dataclass
+class NetworkConfig:
+    """网络配置"""
+    dns_servers: List[str] = field(default_factory=lambda: _get_env_list(
+        "DNS_SERVERS", "8.8.8.8,8.8.4.4,1.1.1.1"
+    ))
+    user_agent: str = field(default_factory=lambda: os.environ.get(
+        "USER_AGENT",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    ))
+    verify_ssl: bool = field(default_factory=lambda: _get_env_bool("VERIFY_SSL", True))
+
+
+@dataclass
+class SecurityConfig:
+    """安全配置"""
+    # SSRF 防护
+    ssrf_protection_enabled: bool = field(default_factory=lambda: _get_env_bool("SSRF_PROTECTION", True))
+    allow_private_ips: bool = field(default_factory=lambda: _get_env_bool("ALLOW_PRIVATE_IPS", False))
     
-    # 线程配置
-    "max_threads": 20,
-    "subdomain_threads": 10,
-    "port_threads": 50,
-    "dir_threads": 10,
+    # 速率限制
+    max_rate: int = field(default_factory=lambda: _get_env_int("MAX_RATE", 100))
+    max_burst: int = field(default_factory=lambda: _get_env_int("MAX_BURST", 200))
     
-    # 输出目录
-    "output_dir": OUTPUT_DIR,
+    # API 认证
+    api_keys: List[str] = field(default_factory=lambda: _get_env_list("API_KEYS", ""))
+    auth_enabled: bool = field(default_factory=lambda: _get_env_bool("AUTH_ENABLED", False))
+
+
+@dataclass
+class OutputConfig:
+    """输出配置"""
+    output_dir: str = field(default_factory=lambda: os.environ.get(
+        "OUTPUT_DIR", 
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "reports")
+    ))
+    log_level: str = field(default_factory=lambda: os.environ.get("LOG_LEVEL", "INFO"))
+    log_file: Optional[str] = field(default_factory=lambda: os.environ.get("LOG_FILE", None))
+
+
+@dataclass
+class AppConfig:
+    """应用总配置"""
+    base_dir: str = field(default_factory=lambda: os.path.dirname(os.path.abspath(__file__)))
+    timeout: TimeoutConfig = field(default_factory=TimeoutConfig)
+    threading: ThreadingConfig = field(default_factory=ThreadingConfig)
+    network: NetworkConfig = field(default_factory=NetworkConfig)
+    security: SecurityConfig = field(default_factory=SecurityConfig)
+    output: OutputConfig = field(default_factory=OutputConfig)
     
     # 默认扫描端口
-    "default_ports": [
+    default_ports: List[int] = field(default_factory=lambda: [
         21, 22, 23, 25, 53, 80, 81, 88, 110, 135, 139, 143, 
         443, 445, 465, 587, 993, 995, 1433, 1521, 3306, 
         3389, 5432, 5900, 6379, 7001, 8000, 8080, 8443, 
         8888, 9000, 9090, 27017, 9200, 11211
-    ],
+    ])
     
-    # User-Agent
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    
-    # 子域名字典
-    "subdomain_prefixes": [
-        'www', 'mail', 'ftp', 'admin', 'blog', 'api', 'dev', 'test',
-        'staging', 'portal', 'app', 'mobile', 'm', 'bbs', 'forum',
-        'cdn', 'static', 'img', 'image', 'images', 'video', 'media',
-        'shop', 'store', 'pay', 'payment', 'secure', 'vpn', 'remote',
-        'git', 'svn', 'jenkins', 'ci', 'crm', 'erp', 'oa', 'hr',
-        'email', 'webmail', 'smtp', 'pop', 'imap', 'ns1', 'ns2',
-        'proxy', 'cache', 'file', 'download', 'upload', 'assets',
-        'css', 'js', 'fonts', 'lib', 'docs', 'help', 'support'
-    ],
-    
-    # 目录字典
-    "dir_wordlist": [
-        '/', '/admin', '/login', '/api', '/backup', '/config',
-        '/data', '/db', '/files', '/images', '/js', '/css',
-        '/uploads', '/tmp', '/test', '/debug', '.git', '.svn',
-        '.env', 'robots.txt', 'sitemap.xml', 'phpinfo.php',
-        '/wp-admin', '/wp-login.php', '/administrator',
-        '/manager', '/console', '/druid', '/actuator',
-        '/swagger-ui.html', '/api-docs', '/graphql',
-        '/.git/config', '/.svn/entries', '/WEB-INF/web.xml',
-        '/admin.php', '/install.php', '/config.php.bak',
-        '/backup.zip', '/db.sql', '/database.sql'
-    ]
-}
+    def __post_init__(self):
+        """确保输出目录存在"""
+        os.makedirs(self.output.output_dir, exist_ok=True)
+
+
+# 全局配置实例
+config = AppConfig()
+
+
+# ============== 以下为静态配置（指纹库等） ==============
 
 # Web指纹库
-FINGERPRINTS = {
+FINGERPRINTS: Dict[str, List[str]] = {
     # CMS
     'WordPress': ['wp-content', 'wp-includes', 'wp-login.php'],
     'Drupal': ['Drupal.settings', 'misc/drupal.js', '/misc/drupal.js'],
@@ -112,7 +176,7 @@ FINGERPRINTS = {
 }
 
 # 端口服务识别
-SERVICE_SIGNATURES = {
+SERVICE_SIGNATURES: Dict[int, str] = {
     21: 'FTP',
     22: 'SSH',
     23: 'Telnet',
@@ -139,7 +203,7 @@ SERVICE_SIGNATURES = {
 }
 
 # 敏感文件/目录
-SENSITIVE_PATHS = [
+SENSITIVE_PATHS: List[str] = [
     # 版本控制
     '/.git/config', '/.git/HEAD', '/.svn/entries', '/.hg/',
     
@@ -166,3 +230,52 @@ SENSITIVE_PATHS = [
     # 监控
     '/actuator', '/druid', '/solr', '/jenkins'
 ]
+
+# 子域名前缀（常用）
+SUBDOMAIN_PREFIXES: List[str] = [
+    'www', 'mail', 'ftp', 'admin', 'blog', 'api', 'dev', 'test',
+    'staging', 'portal', 'app', 'mobile', 'm', 'bbs', 'forum',
+    'cdn', 'static', 'img', 'image', 'images', 'video', 'media',
+    'shop', 'store', 'pay', 'payment', 'secure', 'vpn', 'remote',
+    'git', 'svn', 'jenkins', 'ci', 'crm', 'erp', 'oa', 'hr',
+    'email', 'webmail', 'smtp', 'pop', 'imap', 'ns1', 'ns2',
+    'proxy', 'cache', 'file', 'download', 'upload', 'assets',
+    'css', 'js', 'fonts', 'lib', 'docs', 'help', 'support'
+]
+
+# 目录字典
+DIR_WORDLIST: List[str] = [
+    '/', '/admin', '/login', '/api', '/backup', '/config',
+    '/data', '/db', '/files', '/images', '/js', '/css',
+    '/uploads', '/tmp', '/test', '/debug', '.git', '.svn',
+    '.env', 'robots.txt', 'sitemap.xml', 'phpinfo.php',
+    '/wp-admin', '/wp-login.php', '/administrator',
+    '/manager', '/console', '/druid', '/actuator',
+    '/swagger-ui.html', '/api-docs', '/graphql',
+    '/.git/config', '/.svn/entries', '/WEB-INF/web.xml',
+    '/admin.php', '/install.php', '/config.php.bak',
+    '/backup.zip', '/db.sql', '/database.sql'
+]
+
+
+# ============== 兼容旧代码 ==============
+
+# 基础配置
+BASE_DIR = config.base_dir
+OUTPUT_DIR = config.output.output_dir
+
+# 向后兼容的 CONFIG 字典
+CONFIG = {
+    "timeout": config.timeout.total,
+    "connect_timeout": config.timeout.connect,
+    "read_timeout": config.timeout.read,
+    "max_threads": config.threading.max_threads,
+    "subdomain_threads": config.threading.subdomain_threads,
+    "port_threads": config.threading.port_threads,
+    "dir_threads": config.threading.dir_threads,
+    "output_dir": config.output.output_dir,
+    "default_ports": config.default_ports,
+    "user_agent": config.network.user_agent,
+    "subdomain_prefixes": SUBDOMAIN_PREFIXES,
+    "dir_wordlist": DIR_WORDLIST,
+}

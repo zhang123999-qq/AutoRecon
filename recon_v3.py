@@ -6,6 +6,20 @@ AutoRecon v3.0 - 信息收集自动化工具
 
 作者: 小欣
 架构: 模块化、异步、可扩展
+
+⚠️ 免责声明 / DISCLAIMER ⚠️
+
+本工具仅供授权的安全测试使用。未经授权对第三方系统进行扫描属于违法行为。
+使用者需确保：
+1. 已获得目标系统所有者的书面授权
+2. 遵守当地法律法规（《网络安全法》、《刑法》第285-287条等）
+3. 扫描结果仅用于安全评估目的
+
+作者不对任何滥用行为承担责任。使用者需自行承担法律责任。
+
+This tool is for authorized security testing only. Unauthorized scanning
+of third-party systems is illegal. Users must ensure they have proper
+authorization before use. The author is not responsible for any misuse.
 """
 
 import asyncio
@@ -27,6 +41,150 @@ from modules.async_subdomain import AsyncSubdomainCollector
 from modules.vuln_scanner import VulnerabilityScanner
 from modules.sqli_scanner import IntelligentSQLiScanner
 from jinja2 import Environment, FileSystemLoader
+import urllib.parse
+import ipaddress
+import re
+
+# 尝试导入 validators，如果不存在则使用内置验证
+try:
+    import validators
+    HAS_VALIDATORS = True
+except ImportError:
+    HAS_VALIDATORS = False
+    validators = None
+
+
+def _validate_domain_builtin(domain: str) -> bool:
+    """内置域名验证（validators 不可用时使用）"""
+    # 简单的域名正则验证
+    pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
+    return bool(re.match(pattern, domain))
+
+
+def _validate_ip_builtin(ip: str) -> bool:
+    """内置 IP 验证"""
+    try:
+        ipaddress.ip_address(ip)
+        return True
+    except ValueError:
+        return False
+
+
+def confirm_authorization() -> bool:
+    """确认用户已获得授权"""
+    print("""
+\u001b[33m╔═══════════════════════════════════════════════════════════╗
+║                    ⚠️  重要警告                            ║
+╠═══════════════════════════════════════════════════════════╣
+║  本工具仅供授权的安全测试使用                              ║
+║  未经授权的扫描可能违反《网络安全法》等法律法规            ║
+║  违者可能面临行政处罚或刑事责任                           ║
+╚═══════════════════════════════════════════════════════════╝\u001b[0m
+
+请确认：
+  [1] 已获得目标系统所有者的书面授权
+  [2] 扫描目的为安全评估或渗透测试
+  [3] 了解并愿意承担法律责任
+""")
+    try:
+        answer = input("确认已获得授权？[y/N]: ").strip().lower()
+        return answer in ['y', 'yes']
+    except EOFError:
+        return False
+
+
+def validate_target(target: str) -> str:
+    """验证并清理目标域名或 IP"""
+    if not target:
+        raise ValueError("目标不能为空")
+    
+    # 去除协议前缀和路径
+    target = target.replace('http://', '').replace('https://', '').strip('/')
+    target = target.split('/')[0]
+    
+    # 处理端口号（注意 IPv6 地址包含冒号）
+    # IPv6 地址格式：[::1] 或 2001:4860::8888
+    if target.startswith('['):
+        # IPv6 带端口号格式：[::1]:8080
+        target = target.split(']')[0].strip('[]')
+    elif ':' in target and not '::' in target:
+        # 可能是 IPv4:端口 或 域名:端口
+        # 检查是否是纯数字端口
+        parts = target.rsplit(':', 1)
+        if parts[-1].isdigit():
+            target = parts[0]
+    # 如果包含 :: 则是 IPv6 地址，不分割
+    
+    # 验证域名
+    if HAS_VALIDATORS:
+        try:
+            if validators.domain(target):
+                return target
+        except:
+            pass
+    else:
+        if _validate_domain_builtin(target):
+            return target
+    
+    # 验证 IP
+    if HAS_VALIDATORS:
+        try:
+            if validators.ip_address.ipv4(target) or validators.ip_address.ipv6(target):
+                return target
+        except:
+            pass
+    else:
+        if _validate_ip_builtin(target):
+            return target
+    
+    raise ValueError(f"无效的目标: {target}")
+
+
+def validate_url(url: str) -> str:
+    """验证并清理 URL，防止命令注入和 SSRF"""
+    if not url:
+        raise ValueError("URL 不能为空")
+    
+    # 验证 URL 格式
+    if HAS_VALIDATORS:
+        try:
+            if not validators.url(url):
+                raise ValueError(f"无效的 URL: {url}")
+        except:
+            raise ValueError(f"无效的 URL: {url}")
+    else:
+        # 内置 URL 验证
+        try:
+            parsed = urllib.parse.urlparse(url)
+            if not parsed.scheme or not parsed.netloc:
+                raise ValueError(f"无效的 URL: {url}")
+        except:
+            raise ValueError(f"无效的 URL: {url}")
+    
+    # 只允许 http/https
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ['http', 'https']:
+        raise ValueError(f"只允许 http/https 协议: {url}")
+    
+    # 防止命令注入字符
+    dangerous_chars = [';', '|', '&', '$', '`', '\n', '\r', '{', '}', '<', '>']
+    for char in dangerous_chars:
+        if char in url:
+            raise ValueError(f"URL 包含非法字符: {char}")
+    
+    return url
+
+
+def validate_parameter(param: str) -> str:
+    """验证参数名，防止命令注入"""
+    if not param:
+        raise ValueError("参数名不能为空")
+    
+    # 只允许字母、数字、下划线、连字符
+    if not re.match(r'^[a-zA-Z0-9_-]+$', param):
+        raise ValueError(f"无效的参数名: {param}")
+    
+    return param
 
 
 class ReconToolV3:
@@ -147,7 +305,10 @@ class ReconToolV3:
                 writer.close()
                 await writer.wait_closed()
                 return (port, True)
-            except:
+            except (asyncio.TimeoutError, ConnectionRefusedError, ConnectionResetError):
+                return (port, False)
+            except Exception as e:
+                logger.debug(f"Port scan error for {host}:{port}: {e}")
                 return (port, False)
         
         for host in hosts[:10]:  # 限制主机数
@@ -192,11 +353,20 @@ class ReconToolV3:
                         results['cdn'] = cdn
                         break
         
-        # HTTP头检测
+        # HTTP头检测 - 尝试 HTTPS 和 HTTP
         if not results['cdn']:
             async with AsyncHTTPClient() as client:
-                resp = await client.get(f"http://{self.target}")
-                headers = {k.lower(): v.lower() for k, v in resp.get('headers', {}).items()}
+                # 先尝试 HTTPS
+                try:
+                    resp = await client.get(f"https://{self.target}")
+                    headers = {k.lower(): v.lower() for k, v in resp.get('headers', {}).items()}
+                except:
+                    # HTTPS 失败，尝试 HTTP
+                    try:
+                        resp = await client.get(f"http://{self.target}")
+                        headers = {k.lower(): v.lower() for k, v in resp.get('headers', {}).items()}
+                    except:
+                        headers = {}
                 
                 cdn_headers = {
                     'CloudFlare': ['cf-ray', 'cloudflare'],
@@ -493,15 +663,35 @@ async def main():
     
     parser.add_argument('target', nargs='?', help='目标域名或IP')
     parser.add_argument('-m', '--modules', help='指定模块(逗号分隔)，all=全部')
-    parser.add_argument('-t', '--threads', type=int, default=50, help='并发数(默认50)')
+    parser.add_argument('-t', '--threads', type=int, default=50, 
+                        help='并发数(默认50，范围1-200)')
     parser.add_argument('-o', '--output', help='输出目录')
     parser.add_argument('-v', '--verbose', action='store_true', help='详细输出')
+    parser.add_argument('-y', '--yes', action='store_true', help='跳过授权确认(已获授权时使用)')
     
     args = parser.parse_args()
+    
+    # 限制并发数在安全范围内
+    if args.threads:
+        args.threads = max(1, min(args.threads, 200))  # 限制 1-200
     
     if not args.target:
         parser.print_help()
         print("\n\u001b[31m错误: 请指定目标域名或IP\u001b[0m")
+        sys.exit(1)
+    
+    # 授权确认（安全警告）
+    # 使用 --yes 或 -y 参数跳过确认（自动化脚本场景）
+    if not args.yes and not confirm_authorization():
+        print("\n\u001b[33m未确认授权，扫描已取消。\u001b[0m")
+        print("提示: 如需跳过确认，可使用 --yes 或 -y 参数\n")
+        sys.exit(0)
+    
+    # 验证目标
+    try:
+        args.target = validate_target(args.target)
+    except ValueError as e:
+        print(f"\n\u001b[31m错误: {e}\u001b[0m")
         sys.exit(1)
     
     # 解析模块

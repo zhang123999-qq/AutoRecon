@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-日志模块 - 支持分级日志和彩色输出
+日志模块 - 支持分级日志、彩色输出和敏感信息过滤
 """
 
 import sys
 import logging
+import re
 from datetime import datetime
 
 # Windows控制台编码修复
@@ -14,6 +15,53 @@ if sys.platform == 'win32':
         sys.stdout.reconfigure(encoding='utf-8')
     except:
         pass
+
+
+# ============== 敏感信息过滤 ==============
+
+SENSITIVE_PATTERNS = [
+    # 密码
+    (r'(password\s*[=:]\s*)[^\s,;\}\]]+', r'\1***'),
+    (r'(passwd\s*[=:]\s*)[^\s,;\}\]]+', r'\1***'),
+    (r'(pwd\s*[=:]\s*)[^\s,;\}\]]+', r'\1***'),
+    # API Keys
+    (r'(api_key\s*[=:]\s*)[^\s,;\}\]]+', r'\1***'),
+    (r'(apikey\s*[=:]\s*)[^\s,;\}\]]+', r'\1***'),
+    (r'(api-key\s*[=:]\s*)[^\s,;\}\]]+', r'\1***'),
+    # Token
+    (r'(token\s*[=:]\s*)[^\s,;\}\]]+', r'\1***'),
+    (r'(access_token\s*[=:]\s*)[^\s,;\}\]]+', r'\1***'),
+    (r'(auth_token\s*[=:]\s*)[^\s,;\}\]]+', r'\1***'),
+    (r'(bearer\s+)[a-zA-Z0-9_-]+', r'\1***'),
+    # Secret
+    (r'(secret\s*[=:]\s*)[^\s,;\}\]]+', r'\1***'),
+    (r'(secret_key\s*[=:]\s*)[^\s,;\}\]]+', r'\1***'),
+    # Authorization Header
+    (r'(Authorization\s*:\s*Bearer\s+)[a-zA-Z0-9_-]+', r'\1***'),
+    # Cookie
+    (r'(cookie\s*[=:]\s*)[^\s,;\}\]]+', r'\1***'),
+]
+
+
+def sanitize_message(message: str) -> str:
+    """清理日志消息中的敏感信息
+    
+    将密码、API Key、Token 等敏感信息替换为 ***
+    
+    Args:
+        message: 原始消息
+        
+    Returns:
+        清理后的消息
+    """
+    if not isinstance(message, str):
+        message = str(message)
+    
+    sanitized = message
+    for pattern, replacement in SENSITIVE_PATTERNS:
+        sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
+    
+    return sanitized
 
 
 class LogLevel:
@@ -26,7 +74,7 @@ class LogLevel:
 
 
 class ColoredFormatter(logging.Formatter):
-    """彩色日志格式化器"""
+    """彩色日志格式化器（带敏感信息过滤）"""
     
     # ANSI颜色代码
     COLORS = {
@@ -46,6 +94,9 @@ class ColoredFormatter(logging.Formatter):
         # 格式化消息
         timestamp = datetime.now().strftime('%H:%M:%S')
         message = record.getMessage()
+        
+        # 过滤敏感信息
+        message = sanitize_message(message)
         
         return f"{color}[{timestamp}] [{level_name}] {message}{self.COLORS['RESET']}"
 

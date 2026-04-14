@@ -300,11 +300,38 @@ class IntelligentSQLiScanner:
         return None
     
     async def _run_sqlmap_cmd(self, url: str, parameter: str) -> Optional[Dict]:
-        """使用命令行运行 sqlmap"""
+        """使用命令行运行 sqlmap - 已添加安全验证"""
         
         import subprocess
         import tempfile
         import json
+        import shlex
+        
+        # 安全验证
+        try:
+            # 验证 URL
+            if not url:
+                raise ValueError("URL 不能为空")
+            
+            parsed = urllib.parse.urlparse(url)
+            if parsed.scheme not in ['http', 'https']:
+                raise ValueError(f"只允许 http/https 协议")
+            
+            # 防止命令注入
+            dangerous_chars = [';', '|', '&', '$', '`', '\n', '\r', '{', '}', '<', '>', '\x00']
+            for char in dangerous_chars:
+                if char in url:
+                    raise ValueError(f"URL 包含非法字符")
+                if char in parameter:
+                    raise ValueError(f"参数名包含非法字符")
+            
+            # 验证参数名（只允许字母、数字、下划线、连字符）
+            if not re.match(r'^[a-zA-Z0-9_-]+$', parameter):
+                raise ValueError(f"无效的参数名")
+                
+        except ValueError as e:
+            print(f"[\u001b[31m!\u001b[0m] 安全验证失败: {e}")
+            return None
         
         output_file = tempfile.mktemp(suffix='.json')
         

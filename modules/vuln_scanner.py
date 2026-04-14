@@ -61,7 +61,11 @@ class VulnerabilityScanner:
                 "body": resp.get("body", "")[:500],
                 "headers": resp.get("headers", {})
             }
-        except:
+        except aiohttp.ClientError as e:
+            logger.debug(f"HTTP request failed for {url}: {e}")
+            return {"url": url, "path": path, "status": 0}
+        except Exception as e:
+            logger.warning(f"Unexpected error checking {url}: {e}")
             return {"url": url, "path": path, "status": 0}
     
     async def scan_sensitive_files(self) -> List[Vulnerability]:
