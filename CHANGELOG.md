@@ -2,6 +2,46 @@
 
 所有重要的更改都将记录在此文件中。
 
+## [3.3.1] - 2026-04-15
+
+### 源码质量优化 📊
+
+#### 质量评分提升
+| 指标 | 初始 | 最终 | 提升 |
+|------|------|------|------|
+| 综合评分 | 6.2/10 | 8.6/10 | +2.4 |
+| 警告数量 | 54 | 8 | -46 |
+| 类型注解 | 0.0/10 | 6.1/10 | +6.1 |
+| 文档字符串 | 5.4/10 | 6.5/10 | +1.1 |
+| 代码复杂度 | 5.5/10 | 6.7/10 | +1.2 |
+
+#### 代码修复
+| 修复项 | 数量 | 说明 |
+|--------|------|------|
+| 裸 except 替换 | 26处 | 改为具体异常类型 |
+| 复杂度重构 | 5个函数 | 表驱动模式替代多层 if-elif |
+| 类型注解 | 核心模块 | utils, logger, base, report, app |
+| 文档字符串 | 数据模型 | ScanRequest, ScanStatus, ConnectionManager 等 |
+| 测试修复 | 6个 | SQLiteCache 测试缺少 await |
+
+#### 重构的复杂函数
+| 文件 | 函数 | 复杂度变化 |
+|------|------|------------|
+| `dir_scanner.py` | `_classify_sensitive_path` | 18→4 |
+| `stress_advanced.py` | `PerformanceAnalyzer.analyze` | 22→5 |
+| `stress_advanced.py` | `calculate_score` | 16→3 |
+| `stress_test.py` | `_calculate_stress_level` | 19→3 |
+| `code_quality_check.py` | `check_security` | 19→5 |
+
+#### 测试验证
+- 69 个测试全部通过
+- 安全修复测试：12 passed
+- SSRF 防护测试：18 passed
+- 输入验证测试：19 passed
+- 核心模块测试：20 passed
+
+---
+
 ## [3.3.0] - 2026-04-14
 
 ### 安全加固 🔒

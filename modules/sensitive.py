@@ -2,7 +2,43 @@
 # -*- coding: utf-8 -*-
 """
 敏感信息检测模块 v2.1
+
+⚠️ 已废弃警告 ⚠
+--------------
+此模块已废弃，建议使用：
+    from modules.js_analyzer import JSAnalyzer
+
+原因：
+    1. 功能与 js_analyzer.py 重复
+    2. 使用同步 HTTPClient，无 SSRF 防护
+    3. js_analyzer.py 已实现相同功能且更完善
+
+迁移示例：
+    # 旧代码
+    scanner = SensitiveScanner(target)
+    results = scanner.scan()
+    
+    # 新代码
+    async with JSAnalyzer(target) as analyzer:
+        results = await analyzer.detect_secrets()
+
+废弃版本: v3.3.0
+移除版本: v4.0.0
 """
+
+import warnings
+
+warnings.warn(
+    "\n"
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    "⚠️  SensitiveScanner 已废弃\n"
+    "请使用: from modules.js_analyzer import JSAnalyzer\n"
+    "原因: 功能重复、同步方式、无 SSRF 防护\n"
+    "废弃版本: v3.3.0 | 移除版本: v4.0.0\n"
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import sys
 import os

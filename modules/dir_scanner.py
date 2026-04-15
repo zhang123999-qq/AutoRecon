@@ -2,7 +2,44 @@
 # -*- coding: utf-8 -*-
 """
 目录扫描模块
+
+⚠️ 已废弃警告 ⚠
+--------------
+此模块已废弃，建议使用异步版本：
+    from modules.async_dir_scanner import AsyncDirScanner
+
+原因：
+    1. 使用同步方式 + ThreadPoolExecutor，性能较差
+    2. 使用旧版 HTTPClient，无 SSRF 防护
+    3. 不符合项目异步架构
+
+迁移示例：
+    # 旧代码
+    scanner = DirScanner(target)
+    results = scanner.scan()
+    
+    # 新代码
+    async with AsyncDirScanner(target) as scanner:
+        results = await scanner.scan()
+
+废弃版本: v3.3.0
+移除版本: v4.0.0
 """
+
+import warnings
+
+# 显示废弃警告
+warnings.warn(
+    "\n"
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    "⚠️  DirScanner 已废弃\n"
+    "请使用: from modules.async_dir_scanner import AsyncDirScanner\n"
+    "原因: 同步方式、无 SSRF 防护、性能较差\n"
+    "废弃版本: v3.3.0 | 移除版本: v4.0.0\n"
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import sys
 import os
@@ -89,23 +126,35 @@ class DirScanner:
         return found
     
     def _classify_sensitive_path(self, path):
-        """分类敏感路径"""
+        """分类敏感路径
+        
+        使用模式匹配字典替代多层if-elif，降低圈复杂度。
+        
+        Args:
+            path: 路径字符串
+            
+        Returns:
+            分类名称
+        """
         path_lower = path.lower()
         
-        if '.git' in path_lower or '.svn' in path_lower or '.hg' in path_lower:
-            return '版本控制'
-        elif '.env' in path_lower or 'config' in path_lower or 'settings' in path_lower:
-            return '配置文件'
-        elif 'backup' in path_lower or '.sql' in path_lower or '.zip' in path_lower:
-            return '备份文件'
-        elif 'admin' in path_lower or 'login' in path_lower or 'manager' in path_lower:
-            return '后台入口'
-        elif 'phpinfo' in path_lower or 'info.php' in path_lower:
-            return '信息泄露'
-        elif 'swagger' in path_lower or 'api-docs' in path_lower or 'graphql' in path_lower:
-            return 'API文档'
-        else:
-            return '其他敏感文件'
+        # 模式匹配规则（按优先级排序）
+        patterns = [
+            # (关键词元组, 分类名称)
+            (('.git', '.svn', '.hg'), '版本控制'),
+            (('.env',), '配置文件'),
+            (('config', 'settings'), '配置文件'),
+            (('backup', '.sql', '.zip'), '备份文件'),
+            (('admin', 'login', 'manager'), '后台入口'),
+            (('phpinfo', 'info.php'), '信息泄露'),
+            (('swagger', 'api-docs', 'graphql'), 'API文档'),
+        ]
+        
+        for keywords, category in patterns:
+            if any(kw in path_lower for kw in keywords):
+                return category
+        
+        return '其他敏感文件'
     
     def run(self, wordlist=None, scan_sensitive=True):
         """执行完整目录扫描"""

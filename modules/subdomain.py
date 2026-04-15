@@ -2,7 +2,44 @@
 # -*- coding: utf-8 -*-
 """
 子域名收集模块 v2.1
+
+⚠️ 已废弃警告 ⚠
+--------------
+此模块已废弃，建议使用异步版本：
+    from modules.async_subdomain import AsyncSubdomainCollector
+
+原因：
+    1. 使用同步方式，性能较差
+    2. 使用旧版 HTTPClient，无 SSRF 防护
+    3. 不符合项目异步架构
+
+迁移示例：
+    # 旧代码
+    collector = SubdomainCollector(domain)
+    results = collector.collect_from_dns()
+    
+    # 新代码
+    async with AsyncSubdomainCollector(domain) as collector:
+        results = await collector.collect_from_dns()
+
+废弃版本: v3.3.0
+移除版本: v4.0.0
 """
+
+import warnings
+
+# 显示废弃警告
+warnings.warn(
+    "\n"
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    "⚠️  SubdomainCollector 已废弃\n"
+    "请使用: from modules.async_subdomain import AsyncSubdomainCollector\n"
+    "原因: 同步方式、无 SSRF 防护、性能较差\n"
+    "废弃版本: v3.3.0 | 移除版本: v4.0.0\n"
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import sys
 import os

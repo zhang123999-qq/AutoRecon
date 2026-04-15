@@ -158,7 +158,7 @@ class SSLCertificateScanner:
         try:
             # 格式: "Mar 24 10:00:00 2026 GMT"
             return datetime.strptime(time_str, "%b %d %H:%M:%S %Y %Z")
-        except:
+        except (ValueError, TypeError):
             return None
     
     def _extract_san(self, cert_dict: Dict) -> List[str]:

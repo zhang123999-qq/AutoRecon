@@ -185,7 +185,7 @@ class SQLMapRESTClient:
                 if isinstance(value, str):
                     try:
                         value = json.loads(value)
-                    except:
+                    except (json.JSONDecodeError, TypeError):
                         continue
                 
                 # 检查是否有注入点

@@ -17,11 +17,11 @@ class BaseModule(ABC):
     """
     
     # 模块元信息（子类可覆盖）
-    MODULE_NAME = "Base Module"
-    MODULE_DESCRIPTION = "Base module description"
-    MODULE_VERSION = "1.0"
+    MODULE_NAME: str = "Base Module"
+    MODULE_DESCRIPTION: str = "Base module description"
+    MODULE_VERSION: str = "1.0"
     
-    def __init__(self, target: str, config: Optional[Dict] = None):
+    def __init__(self, target: str, config: Optional[Dict] = None) -> None:
         """初始化模块
         
         Args:
@@ -32,8 +32,8 @@ class BaseModule(ABC):
         self.config = config or {}
         self.results: Dict[str, Any] = {}
         self.errors: List[str] = []
-        self.start_time = None
-        self.end_time = None
+        self.start_time: Optional[float] = None
+        self.end_time: Optional[float] = None
     
     @abstractmethod
     def run(self) -> Dict[str, Any]:
@@ -44,12 +44,12 @@ class BaseModule(ABC):
         """
         raise NotImplementedError("子类必须实现 run() 方法")
     
-    def pre_run(self):
+    def pre_run(self) -> None:
         """扫描前执行（可覆盖）"""
         self.start_time = time.time()
         Logger.module_header(self.MODULE_NAME)
     
-    def post_run(self):
+    def post_run(self) -> None:
         """扫描后执行（可覆盖）"""
         self.end_time = time.time()
         if self.errors:
@@ -90,7 +90,7 @@ class BaseModule(ABC):
             return round(self.end_time - self.start_time, 2)
         return None
     
-    def add_error(self, error: str):
+    def add_error(self, error: str) -> None:
         """添加错误信息"""
         self.errors.append(error)
         Logger.error(error)

@@ -381,7 +381,7 @@ def setup_stress_websocket(app, path: str = "/ws/stress"):
                     # 超时发送心跳检测
                     try:
                         await websocket.send_text("heartbeat")
-                    except:
+                    except (WebSocketDisconnect, RuntimeError, OSError):
                         break
                         
         except WebSocketDisconnect:

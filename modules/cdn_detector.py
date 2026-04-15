@@ -2,7 +2,51 @@
 # -*- coding: utf-8 -*-
 """
 CDN检测模块 v2.1
+
+⚠️ 已废弃警告 ⚠
+--------------
+此模块已废弃，建议使用异步版本：
+    from modules.async_subdomain import AsyncCDNDetector
+    
+或使用核心 CDN 检测功能：
+    from core.scanner import CDNDetector
+
+原因：
+    1. 使用同步 HTTPClient，无 SSRF 防护
+    2. 不符合项目异步架构
+
+迁移示例：
+    # 旧代码
+    scanner = CDNScanner(target)
+    results = scanner.detect()
+    
+    # 新代码（异步）
+    async with AsyncCDNDetector(target) as detector:
+        results = await detector.detect()
+    
+    # 或使用核心功能（同步但安全）
+    from core.scanner import CDNDetector
+    cdn = CDNDetector.detect_from_headers(headers)
+
+废弃版本: v3.3.0
+移除版本: v4.0.0
 """
+
+import warnings
+
+# 显示废弃警告
+warnings.warn(
+    "\n"
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    "⚠️  CDNScanner 已废弃\n"
+    "请使用: from modules.async_subdomain import AsyncCDNDetector\n"
+    "或使用: from core.scanner import CDNDetector\n"
+    "原因: 同步方式、无 SSRF 防护\n"
+    "废弃版本: v3.3.0 | 移除版本: v4.0.0\n"
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import sys
 import os

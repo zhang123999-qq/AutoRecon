@@ -9,11 +9,13 @@ import logging
 import re
 from datetime import datetime
 
+from typing import Optional
+
 # Windows控制台编码修复
 if sys.platform == 'win32':
     try:
         sys.stdout.reconfigure(encoding='utf-8')
-    except:
+    except (OSError, ValueError, AttributeError):
         pass
 
 
@@ -86,7 +88,7 @@ class ColoredFormatter(logging.Formatter):
         'RESET': '\033[0m'       # 重置
     }
     
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         # 获取颜色
         level_name = record.levelname
         color = self.COLORS.get(level_name, self.COLORS['RESET'])
@@ -101,8 +103,16 @@ class ColoredFormatter(logging.Formatter):
         return f"{color}[{timestamp}] [{level_name}] {message}{self.COLORS['RESET']}"
 
 
-def get_logger(name='recon', level=logging.INFO):
-    """获取日志器"""
+def get_logger(name: str = 'recon', level: int = logging.INFO) -> logging.Logger:
+    """获取日志器
+    
+    Args:
+        name: 日志器名称
+        level: 日志级别
+        
+    Returns:
+        配置好的日志器
+    """
     logger = logging.getLogger(name)
     logger.setLevel(level)
     
@@ -134,27 +144,27 @@ class Logger:
     """静态日志工具类（兼容旧代码）"""
     
     @staticmethod
-    def debug(msg):
+    def debug(msg: str) -> None:
         _get_logger().debug(msg)
     
     @staticmethod
-    def info(msg):
+    def info(msg: str) -> None:
         _get_logger().info(msg)
     
     @staticmethod
-    def success(msg):
+    def success(msg: str) -> None:
         _get_logger().log(LogLevel.SUCCESS, msg)
     
     @staticmethod
-    def warn(msg):
+    def warn(msg: str) -> None:
         _get_logger().warning(msg)
     
     @staticmethod
-    def error(msg):
+    def error(msg: str) -> None:
         _get_logger().error(msg)
     
     @staticmethod
-    def banner():
+    def banner() -> None:
         print()
         print("=" * 55)
         print("     信息收集自动化工具 v2.3")
@@ -163,7 +173,7 @@ class Logger:
         print()
     
     @staticmethod
-    def module_header(module_name, module_num=None):
+    def module_header(module_name: str, module_num: Optional[int] = None) -> None:
         """打印模块标题"""
         print("\n" + "=" * 55)
         if module_num:
@@ -173,7 +183,7 @@ class Logger:
         print("=" * 55)
     
     @staticmethod
-    def subtask(task_name):
+    def subtask(task_name: str) -> None:
         """打印子任务"""
         print(f"\n  → {task_name}")
     

@@ -109,164 +109,191 @@ class PerformanceAnalyzer:
     """性能分析器（深度分析）"""
     
     @staticmethod
-    def analyze(metrics: TestMetrics, phase: TestPhase = TestPhase.STRESS) -> AnalysisResult:
-        """深度分析性能瓶颈"""
-        avg_time = metrics.avg_response_time
-        p99_time = metrics.p99_response_time
-        p50_time = metrics.p50_response_time
-        error_rate = metrics.error_rate
-        qps = metrics.qps
-        throughput = metrics.throughput_mbps
+    def _detect_error_types(error_types: Dict[str, int]) -> Dict[str, bool]:
+        """检测错误类型
         
-        # 计算响应时间离散度
-        time_variance = (p99_time / avg_time) if avg_time > 0 else 1
+        Args:
+            error_types: 错误类型字典
+            
+        Returns:
+            包含各错误类型的布尔字典
+        """
+        return {
+            'connection': any(
+                'connection' in e.lower() or 'refused' in e.lower() or 'reset' in e.lower()
+                for e in error_types.keys()
+            ),
+            'timeout': any('timeout' in e.lower() for e in error_types.keys()),
+            'memory': any('memory' in e.lower() or 'oom' in e.lower() for e in error_types.keys()),
+        }
+    
+    @staticmethod
+    def _analyze_connection_bottleneck(metrics: TestMetrics, errors: Dict[str, bool]) -> Optional[AnalysisResult]:
+        """分析连接数瓶颈"""
+        if not errors['connection'] or metrics.error_rate <= 5:
+            return None
         
-        # 分析错误类型
-        error_types = metrics.error_types or {}
-        has_connection_errors = any(
-            'connection' in e.lower() or 'refused' in e.lower() or 'reset' in e.lower()
-            for e in error_types.keys()
+        return AnalysisResult(
+            bottleneck_type=BottleneckType.CONNECTION,
+            confidence=85,
+            description=f"连接数达到上限，错误率 {metrics.error_rate:.1f}%，服务器拒绝新连接",
+            suggestions=[
+                "增加服务器最大连接数配置 (如 nginx: worker_connections)",
+                "启用 TCP 连接复用 (Keep-Alive)",
+                "使用负载均衡分流请求",
+                "检查连接泄漏问题",
+                "调整系统文件描述符限制 (ulimit -n)",
+                f"当前并发 {metrics.concurrent_users}，建议控制在 {metrics.concurrent_users // 2} 以内"
+            ],
+            severity="high" if metrics.error_rate > 20 else "medium"
         )
-        has_timeout_errors = any(
-            'timeout' in e.lower() for e in error_types.keys()
+    
+    @staticmethod
+    def _analyze_timeout_bottleneck(metrics: TestMetrics, errors: Dict[str, bool]) -> Optional[AnalysisResult]:
+        """分析超时瓶颈"""
+        if not errors['timeout'] or metrics.avg_response_time <= 1000:
+            return None
+        
+        return AnalysisResult(
+            bottleneck_type=BottleneckType.NETWORK,
+            confidence=75,
+            description=f"请求超时频繁，平均响应时间 {metrics.avg_response_time:.0f}ms",
+            suggestions=[
+                "检查服务器到数据库的网络延迟",
+                "优化慢查询或慢请求",
+                "增加请求超时时间配置",
+                "检查网络带宽使用情况",
+                "考虑使用 CDN 加速静态资源"
+            ],
+            severity="high" if metrics.avg_response_time > 3000 else "medium"
         )
-        has_memory_errors = any(
-            'memory' in e.lower() or 'oom' in e.lower() for e in error_types.keys()
+    
+    @staticmethod
+    def _analyze_memory_bottleneck(errors: Dict[str, bool]) -> Optional[AnalysisResult]:
+        """分析内存瓶颈"""
+        if not errors['memory']:
+            return None
+        
+        return AnalysisResult(
+            bottleneck_type=BottleneckType.MEMORY,
+            confidence=80,
+            description="检测到内存相关错误，可能是内存不足或泄漏",
+            suggestions=[
+                "增加服务器内存",
+                "检查并修复内存泄漏",
+                "优化数据结构，减少内存占用",
+                "启用对象池复用",
+                "调整 GC 参数 (如 Python 的 GC 阈值)"
+            ],
+            severity="critical"
         )
+    
+    @staticmethod
+    def _analyze_database_bottleneck(metrics: TestMetrics, time_variance: float) -> Optional[AnalysisResult]:
+        """分析数据库瓶颈"""
+        if time_variance <= 4 or metrics.avg_response_time <= 200:
+            return None
         
-        # 1. 连接数瓶颈
-        if has_connection_errors and error_rate > 5:
-            return AnalysisResult(
-                bottleneck_type=BottleneckType.CONNECTION,
-                confidence=85,
-                description=f"连接数达到上限，错误率 {error_rate:.1f}%，服务器拒绝新连接",
-                suggestions=[
-                    "增加服务器最大连接数配置 (如 nginx: worker_connections)",
-                    "启用 TCP 连接复用 (Keep-Alive)",
-                    "使用负载均衡分流请求",
-                    "检查连接泄漏问题",
-                    "调整系统文件描述符限制 (ulimit -n)",
-                    f"当前并发 {metrics.concurrent_users}，建议控制在 {metrics.concurrent_users // 2} 以内"
-                ],
-                severity="high" if error_rate > 20 else "medium"
-            )
+        return AnalysisResult(
+            bottleneck_type=BottleneckType.DATABASE,
+            confidence=70,
+            description=f"响应时间波动大 (P99/P50 = {time_variance:.1f}x)，可能是数据库查询慢",
+            suggestions=[
+                "检查慢查询日志，优化 SQL",
+                "添加数据库索引",
+                "增大数据库连接池",
+                "考虑读写分离或分库分表",
+                "启用查询缓存",
+                "使用 Redis 缓存热点数据"
+            ],
+            severity="high" if time_variance > 6 else "medium"
+        )
+    
+    @staticmethod
+    def _analyze_cpu_bottleneck(metrics: TestMetrics, time_variance: float) -> Optional[AnalysisResult]:
+        """分析 CPU 瓶颈"""
+        if metrics.avg_response_time <= 500 or time_variance >= 3 or metrics.error_rate >= 5:
+            return None
         
-        # 2. 超时瓶颈（网络或处理慢）
-        if has_timeout_errors and avg_time > 1000:
-            return AnalysisResult(
-                bottleneck_type=BottleneckType.NETWORK,
-                confidence=75,
-                description=f"请求超时频繁，平均响应时间 {avg_time:.0f}ms",
-                suggestions=[
-                    "检查服务器到数据库的网络延迟",
-                    "优化慢查询或慢请求",
-                    "增加请求超时时间配置",
-                    "检查网络带宽使用情况",
-                    "考虑使用 CDN 加速静态资源"
-                ],
-                severity="high" if avg_time > 3000 else "medium"
-            )
+        return AnalysisResult(
+            bottleneck_type=BottleneckType.CPU,
+            confidence=72,
+            description="响应时间稳定但较长，可能是 CPU 资源不足或计算密集",
+            suggestions=[
+                "增加服务器 CPU 核心数",
+                "优化计算密集型代码",
+                "启用缓存减少重复计算",
+                "使用异步处理或消息队列",
+                "考虑使用更高效的算法",
+                "启用 JIT 编译 (如 PyPy)"
+            ],
+            severity="high" if metrics.avg_response_time > 1000 else "medium"
+        )
+    
+    @staticmethod
+    def _analyze_bandwidth_bottleneck(throughput: float) -> Optional[AnalysisResult]:
+        """分析带宽瓶颈"""
+        if throughput <= 50:
+            return None
         
-        # 3. 内存瓶颈
-        if has_memory_errors:
-            return AnalysisResult(
-                bottleneck_type=BottleneckType.MEMORY,
-                confidence=80,
-                description="检测到内存相关错误，可能是内存不足或泄漏",
-                suggestions=[
-                    "增加服务器内存",
-                    "检查并修复内存泄漏",
-                    "优化数据结构，减少内存占用",
-                    "启用对象池复用",
-                    "调整 GC 参数 (如 Python 的 GC 阈值)"
-                ],
-                severity="critical"
-            )
+        return AnalysisResult(
+            bottleneck_type=BottleneckType.BANDWIDTH,
+            confidence=70,
+            description=f"带宽使用 {throughput:.1f} MB/s，接近或超过上限",
+            suggestions=[
+                "升级服务器带宽",
+                "启用 Gzip/Brotli 压缩",
+                "使用 CDN 分发静态资源",
+                "优化图片和资源体积",
+                "启用 HTTP/2 或 HTTP/3",
+                "实现资源懒加载"
+            ],
+            severity="medium"
+        )
+    
+    @staticmethod
+    def _analyze_app_logic_bottleneck(metrics: TestMetrics) -> Optional[AnalysisResult]:
+        """分析应用逻辑瓶颈"""
+        if metrics.avg_response_time <= 100 or metrics.qps >= 100 or metrics.error_rate >= 1:
+            return None
         
-        # 4. 数据库瓶颈
-        if time_variance > 4 and avg_time > 200:
-            return AnalysisResult(
-                bottleneck_type=BottleneckType.DATABASE,
-                confidence=70,
-                description=f"响应时间波动大 (P99/P50 = {time_variance:.1f}x)，可能是数据库查询慢",
-                suggestions=[
-                    "检查慢查询日志，优化 SQL",
-                    "添加数据库索引",
-                    "增大数据库连接池",
-                    "考虑读写分离或分库分表",
-                    "启用查询缓存",
-                    "使用 Redis 缓存热点数据"
-                ],
-                severity="high" if time_variance > 6 else "medium"
-            )
+        return AnalysisResult(
+            bottleneck_type=BottleneckType.APP_LOGIC,
+            confidence=65,
+            description="低错误率但 QPS 较低，可能是应用逻辑效率问题",
+            suggestions=[
+                "使用性能分析工具定位热点代码",
+                "优化业务逻辑，减少不必要的计算",
+                "减少外部 API 调用或使用缓存",
+                "优化序列化/反序列化过程",
+                "使用连接池复用资源"
+            ],
+            severity="low"
+        )
+    
+    @staticmethod
+    def _analyze_disk_bottleneck(metrics: TestMetrics, time_variance: float) -> Optional[AnalysisResult]:
+        """分析磁盘 I/O 瓶颈"""
+        if metrics.avg_response_time <= 200 or time_variance <= 2 or metrics.qps >= 200:
+            return None
         
-        # 5. CPU 瓶颈
-        if avg_time > 500 and time_variance < 3 and error_rate < 5:
-            return AnalysisResult(
-                bottleneck_type=BottleneckType.CPU,
-                confidence=72,
-                description="响应时间稳定但较长，可能是 CPU 资源不足或计算密集",
-                suggestions=[
-                    "增加服务器 CPU 核心数",
-                    "优化计算密集型代码",
-                    "启用缓存减少重复计算",
-                    "使用异步处理或消息队列",
-                    "考虑使用更高效的算法",
-                    "启用 JIT 编译 (如 PyPy)"
-                ],
-                severity="high" if avg_time > 1000 else "medium"
-            )
-        
-        # 6. 带宽瓶颈
-        if throughput > 50:
-            return AnalysisResult(
-                bottleneck_type=BottleneckType.BANDWIDTH,
-                confidence=70,
-                description=f"带宽使用 {throughput:.1f} MB/s，接近或超过上限",
-                suggestions=[
-                    "升级服务器带宽",
-                    "启用 Gzip/Brotli 压缩",
-                    "使用 CDN 分发静态资源",
-                    "优化图片和资源体积",
-                    "启用 HTTP/2 或 HTTP/3",
-                    "实现资源懒加载"
-                ],
-                severity="medium"
-            )
-        
-        # 7. 应用逻辑瓶颈
-        if avg_time > 100 and qps < 100 and error_rate < 1:
-            return AnalysisResult(
-                bottleneck_type=BottleneckType.APP_LOGIC,
-                confidence=65,
-                description="低错误率但 QPS 较低，可能是应用逻辑效率问题",
-                suggestions=[
-                    "使用性能分析工具定位热点代码",
-                    "优化业务逻辑，减少不必要的计算",
-                    "减少外部 API 调用或使用缓存",
-                    "优化序列化/反序列化过程",
-                    "使用连接池复用资源"
-                ],
-                severity="low"
-            )
-        
-        # 8. 磁盘 I/O 瓶颈
-        if avg_time > 200 and time_variance > 2 and qps < 200:
-            return AnalysisResult(
-                bottleneck_type=BottleneckType.DISK,
-                confidence=60,
-                description="可能是磁盘 I/O 成为瓶颈",
-                suggestions=[
-                    "使用 SSD 替换 HDD",
-                    "优化文件读写逻辑",
-                    "增加内存缓存减少磁盘访问",
-                    "使用异步 I/O",
-                    "考虑使用对象存储"
-                ],
-                severity="medium"
-            )
-        
-        # 默认
+        return AnalysisResult(
+            bottleneck_type=BottleneckType.DISK,
+            confidence=60,
+            description="可能是磁盘 I/O 成为瓶颈",
+            suggestions=[
+                "使用 SSD 替换 HDD",
+                "优化文件读写逻辑",
+                "增加内存缓存减少磁盘访问",
+                "使用异步 I/O",
+                "考虑使用对象存储"
+            ],
+            severity="medium"
+        )
+    
+    @staticmethod
+    def _get_default_result() -> AnalysisResult:
+        """返回默认分析结果"""
         return AnalysisResult(
             bottleneck_type=BottleneckType.UNKNOWN,
             confidence=30,
@@ -279,6 +306,49 @@ class PerformanceAnalyzer:
             ],
             severity="low"
         )
+    
+    @classmethod
+    def analyze(cls, metrics: TestMetrics, phase: TestPhase = TestPhase.STRESS) -> AnalysisResult:
+        """深度分析性能瓶颈
+        
+        Args:
+            metrics: 测试指标数据
+            phase: 测试阶段
+            
+        Returns:
+            分析结果
+        """
+        avg_time = metrics.avg_response_time
+        p99_time = metrics.p99_response_time
+        error_rate = metrics.error_rate
+        qps = metrics.qps
+        throughput = metrics.throughput_mbps
+        
+        # 计算响应时间离散度
+        time_variance = (p99_time / avg_time) if avg_time > 0 else 1
+        
+        # 检测错误类型
+        error_types = metrics.error_types or {}
+        errors = cls._detect_error_types(error_types)
+        
+        # 按优先级检测瓶颈
+        analyzers = [
+            lambda: cls._analyze_connection_bottleneck(metrics, errors),
+            lambda: cls._analyze_timeout_bottleneck(metrics, errors),
+            lambda: cls._analyze_memory_bottleneck(errors),
+            lambda: cls._analyze_database_bottleneck(metrics, time_variance),
+            lambda: cls._analyze_cpu_bottleneck(metrics, time_variance),
+            lambda: cls._analyze_bandwidth_bottleneck(throughput),
+            lambda: cls._analyze_app_logic_bottleneck(metrics),
+            lambda: cls._analyze_disk_bottleneck(metrics, time_variance),
+        ]
+        
+        for analyzer in analyzers:
+            result = analyzer()
+            if result:
+                return result
+        
+        return cls._get_default_result()
 
 
 class IntelligentStressTest:
@@ -467,49 +537,61 @@ class IntelligentStressTest:
         return analysis
     
     def calculate_score(self) -> int:
-        """计算性能评分 (0-100)"""
+        """计算性能评分 (0-100)
+        
+        使用表格驱动方式计算分数，降低圈复杂度。
+        
+        Returns:
+            性能评分 (0-100)
+        """
         if not self.results.stress_test:
             return 0
         
         m = self.results.stress_test
         score = 0
         
-        # QPS 评分 (40 分)
+        # 评分规则表: (阈值, 分数) - 按从高到低排序
+        qps_score_table = [
+            (1000, 40),
+            (500, 32),
+            (200, 24),
+            (100, 16),
+            (50, 8),
+        ]
+        
+        response_time_score_table = [
+            (50, 30),
+            (100, 25),
+            (200, 20),
+            (500, 12),
+            (1000, 5),
+        ]
+        
+        error_rate_score_table = [
+            (0.1, 30),
+            (1, 25),
+            (5, 15),
+            (10, 5),
+        ]
+        
+        # 计算各项得分
         qps = m['qps']
-        if qps >= 1000:
-            score += 40
-        elif qps >= 500:
-            score += 32
-        elif qps >= 200:
-            score += 24
-        elif qps >= 100:
-            score += 16
-        elif qps >= 50:
-            score += 8
+        for threshold, points in qps_score_table:
+            if qps >= threshold:
+                score += points
+                break
         
-        # 响应时间评分 (30 分)
         avg_time = m['avg_time']
-        if avg_time <= 50:
-            score += 30
-        elif avg_time <= 100:
-            score += 25
-        elif avg_time <= 200:
-            score += 20
-        elif avg_time <= 500:
-            score += 12
-        elif avg_time <= 1000:
-            score += 5
+        for threshold, points in response_time_score_table:
+            if avg_time <= threshold:
+                score += points
+                break
         
-        # 错误率评分 (30 分)
         error_rate = m['error_rate']
-        if error_rate <= 0.1:
-            score += 30
-        elif error_rate <= 1:
-            score += 25
-        elif error_rate <= 5:
-            score += 15
-        elif error_rate <= 10:
-            score += 5
+        for threshold, points in error_rate_score_table:
+            if error_rate <= threshold:
+                score += points
+                break
         
         self.results.performance_score = score
         return score

@@ -32,12 +32,32 @@ from core.async_engine import AsyncDNSResolver, AsyncCache, ResultStore
 # ============ 数据模型 ============
 
 class ScanRequest(BaseModel):
+    """扫描请求模型
+    
+    Attributes:
+        target: 扫描目标（域名/IP/URL）
+        modules: 要执行的模块列表
+        threads: 并发线程数
+    """
     target: str
     modules: List[str] = ["subdomain", "cdn", "sensitive"]
     threads: int = 50
 
 
 class ScanStatus(BaseModel):
+    """扫描状态模型
+    
+    Attributes:
+        scan_id: 扫描任务ID
+        target: 扫描目标
+        status: 任务状态（pending/running/completed/failed）
+        progress: 进度百分比
+        current_module: 当前执行的模块
+        results: 扫描结果
+        error: 错误信息
+        created_at: 创建时间
+        elapsed: 已耗时
+    """
     scan_id: str
     target: str
     status: str  # pending, running, completed, failed
@@ -144,16 +164,36 @@ def cleanup_expired_tasks():
 
 # WebSocket 连接管理
 class ConnectionManager:
-    def __init__(self):
+    """WebSocket 连接管理器
+    
+    管理扫描任务的 WebSocket 实时推送连接。
+    
+    Attributes:
+        active_connections: 活跃连接字典，按 scan_id 分组
+    """
+    
+    def __init__(self) -> None:
         self.active_connections: Dict[str, List[WebSocket]] = {}
     
-    async def connect(self, websocket: WebSocket, scan_id: str):
+    async def connect(self, websocket: WebSocket, scan_id: str) -> None:
+        """接受新的 WebSocket 连接
+        
+        Args:
+            websocket: WebSocket 连接对象
+            scan_id: 扫描任务ID
+        """
         await websocket.accept()
         if scan_id not in self.active_connections:
             self.active_connections[scan_id] = []
         self.active_connections[scan_id].append(websocket)
     
-    def disconnect(self, websocket: WebSocket, scan_id: str):
+    def disconnect(self, websocket: WebSocket, scan_id: str) -> None:
+        """断开 WebSocket 连接
+        
+        Args:
+            websocket: WebSocket 连接对象
+            scan_id: 扫描任务ID
+        """
         if scan_id in self.active_connections:
             if websocket in self.active_connections[scan_id]:
                 self.active_connections[scan_id].remove(websocket)
@@ -780,6 +820,15 @@ from modules.stress_advanced import run_stress_test, IntelligentStressTest
 
 
 class StressTestRequest(BaseModel):
+    """压力测试请求模型
+    
+    Attributes:
+        url: 测试目标URL
+        mode: 测试模式（quick/intelligent/capacity）
+        concurrent: 并发数
+        duration: 持续时间（秒）
+        timeout: 超时时间（秒）
+    """
     url: str
     mode: str = "quick"  # quick, intelligent, capacity
     concurrent: int = 10
@@ -788,6 +837,17 @@ class StressTestRequest(BaseModel):
 
 
 class StressTestStatus(BaseModel):
+    """压力测试状态模型
+    
+    Attributes:
+        test_id: 测试任务ID
+        url: 测试目标URL
+        mode: 测试模式
+        status: 任务状态
+        progress: 进度百分比
+        current_phase: 当前阶段
+        results: 测试结果
+    """
     test_id: str
     url: str
     mode: str

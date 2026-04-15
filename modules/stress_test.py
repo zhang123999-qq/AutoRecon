@@ -139,52 +139,70 @@ class TestMetrics:
         self.stress_level = self._calculate_stress_level()
     
     def _calculate_stress_level(self) -> str:
-        """计算抗压等级"""
+        """计算抗压等级
+        
+        使用表格驱动方式计算等级，降低圈复杂度。
+        
+        Returns:
+            抗压等级字符串
+        """
+        # 先检查严重错误情况
         if self.error_rate > 50 or self.avg_response_time > 1000:
             return StressLevel.CRITICAL.value
         
+        # 评分规则表
+        qps_score_table = [
+            (1000, 40),
+            (500, 30),
+            (100, 20),
+            (50, 10),
+        ]
+        
+        response_time_score_table = [
+            (100, 30),
+            (200, 25),
+            (500, 15),
+            (1000, 5),
+        ]
+        
+        error_rate_score_table = [
+            (0.1, 30),
+            (1, 25),
+            (5, 15),
+            (10, 5),
+        ]
+        
+        level_score_table = [
+            (80, StressLevel.EXCELLENT.value),
+            (60, StressLevel.GOOD.value),
+            (40, StressLevel.NORMAL.value),
+            (20, StressLevel.POOR.value),
+        ]
+        
         score = 0
         
-        # QPS 评分
-        if self.qps >= 1000:
-            score += 40
-        elif self.qps >= 500:
-            score += 30
-        elif self.qps >= 100:
-            score += 20
-        elif self.qps >= 50:
-            score += 10
+        # 计算各项得分
+        for threshold, points in qps_score_table:
+            if self.qps >= threshold:
+                score += points
+                break
         
-        # 响应时间评分
-        if self.avg_response_time <= 100:
-            score += 30
-        elif self.avg_response_time <= 200:
-            score += 25
-        elif self.avg_response_time <= 500:
-            score += 15
-        elif self.avg_response_time <= 1000:
-            score += 5
+        for threshold, points in response_time_score_table:
+            if self.avg_response_time <= threshold:
+                score += points
+                break
         
-        # 错误率评分
-        if self.error_rate <= 0.1:
-            score += 30
-        elif self.error_rate <= 1:
-            score += 25
-        elif self.error_rate <= 5:
-            score += 15
-        elif self.error_rate <= 10:
-            score += 5
+        for threshold, points in error_rate_score_table:
+            if self.error_rate <= threshold:
+                score += points
+                break
         
-        if score >= 80:
-            return StressLevel.EXCELLENT.value
-        elif score >= 60:
-            return StressLevel.GOOD.value
-        elif score >= 40:
-            return StressLevel.NORMAL.value
-        elif score >= 20:
-            return StressLevel.POOR.value
-        else:
-            return StressLevel.CRITICAL.value
+        # 根据总分确定等级
+        for threshold, level in level_score_table:
+            if score >= threshold:
+                return level
+        
+        return StressLevel.CRITICAL.value
     
     def to_dict(self) -> Dict:
         """转换为字典"""

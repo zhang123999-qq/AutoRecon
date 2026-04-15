@@ -2,7 +2,43 @@
 # -*- coding: utf-8 -*-
 """
 Whois查询模块
+
+⚠️ 已废弃警告 ⚠
+--------------
+此模块已废弃，建议使用异步版本：
+    from modules.async_whois import AsyncWhoisQuery
+
+原因：
+    1. 使用同步 urllib，阻塞事件循环
+    2. 使用外部命令执行（whois）
+    3. 不符合项目异步架构
+
+迁移示例：
+    # 旧代码
+    query = WhoisQuery(domain)
+    results = query.query_online()
+    
+    # 新代码
+    async with AsyncWhoisQuery(domain) as query:
+        results = await query.query_online()
+
+废弃版本: v3.3.0
+移除版本: v4.0.0
 """
+
+import warnings
+
+warnings.warn(
+    "\n"
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    "⚠️  WhoisQuery 已废弃\n"
+    "请使用: from modules.async_whois import AsyncWhoisQuery\n"
+    "原因: 同步方式、外部命令执行\n"
+    "废弃版本: v3.3.0 | 移除版本: v4.0.0\n"
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import sys
 import os
@@ -173,12 +209,13 @@ class WhoisQuery:
                     try:
                         expiry_date = datetime.strptime(expiry[:19].replace('T', ' ').split('.')[0].strip(), fmt.replace('T%H:%M:%S', ' %H:%M:%S'))
                         break
-                    except:
+                    except (ValueError, TypeError, IndexError):
                         continue
                 
                 if expiry_date:
                     return datetime.now() > expiry_date
-            except:
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.debug(f"解析过期时间失败: {e}")
                 pass
         
         return False

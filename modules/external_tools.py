@@ -172,19 +172,24 @@ class SubfinderRunner:
         self.path = self.manager.get_tool_path('subfinder')
     
     def run(self, domain, output_file=None):
-        """运行subfinder"""
+        """运行subfinder
+        
+        使用安全的参数列表方式执行，防止命令注入。
+        """
         if not self.available:
             Logger.warn("subfinder 未安装，使用内置子域名收集")
             return None
         
         Logger.info(f"使用 subfinder 收集 {domain} 的子域名...")
         
-        cmd = f'"{self.path}" -d {domain} -silent'
+        # 构建参数列表（安全方式）
+        args = ['-d', domain, '-silent']
         
         if output_file:
-            cmd += f' -o {output_file}'
+            args.extend(['-o', output_file])
         
-        result = CommandRunner.run(cmd, timeout=300)
+        # 使用 run_safe 方法，防止命令注入
+        result = CommandRunner.run_safe(self.path, args, timeout=300)
         
         if result['success']:
             subdomains = result['stdout'].strip().split('\n')
@@ -210,6 +215,9 @@ class NmapRunner:
             target: 目标IP或域名
             ports: 端口列表
             scan_type: 扫描类型 (quick, full, service, vuln)
+            
+        Security:
+            使用参数列表方式执行，防止命令注入。
         """
         if not self.available:
             Logger.warn("nmap 未安装，使用内置端口扫描")
@@ -217,26 +225,26 @@ class NmapRunner:
         
         Logger.info(f"使用 nmap 扫描 {target}...")
         
-        cmd = [f'"{self.path}"']
+        # 构建参数列表（安全方式）
+        args = []
         
         # 扫描类型
         if scan_type == 'quick':
-            cmd.append('-T4')  # 快速扫描
-            cmd.append('-F')   # 常用端口
+            args.extend(['-T4', '-F'])  # 快速扫描，常用端口
         elif scan_type == 'full':
-            cmd.append('-p-')  # 全端口
+            args.append('-p-')  # 全端口
         elif scan_type == 'service':
-            cmd.append('-sV')  # 服务版本检测
-            cmd.append('-sC')  # 默认脚本
+            args.extend(['-sV', '-sC'])  # 服务版本检测
         elif scan_type == 'vuln':
-            cmd.append('--script=vuln')  # 漏洞扫描
+            args.append('--script=vuln')  # 漏洞扫描
         
         if ports:
-            cmd.append(f'-p {",".join(map(str, ports))}')
+            args.extend(['-p', ','.join(map(str, ports))])
         
-        cmd.append(target)
+        args.append(target)
         
-        result = CommandRunner.run(' '.join(cmd), timeout=600)
+        # 使用 run_safe 方法，防止命令注入
+        result = CommandRunner.run_safe(self.path, args, timeout=600)
         
         if result['success']:
             Logger.success(f"nmap 扫描完成")
@@ -259,6 +267,9 @@ class HttpxRunner:
         Args:
             urls: URL列表或文件路径
             output_file: 输出文件
+            
+        Security:
+            使用参数列表方式执行，防止命令注入。
         """
         if not self.available:
             Logger.warn("httpx 未安装，使用内置HTTP探测")
@@ -266,11 +277,12 @@ class HttpxRunner:
         
         Logger.info(f"使用 httpx 探测存活...")
         
-        cmd = f'"{self.path}" -silent -status-code -title -tech-detect'
+        # 构建参数列表（安全方式）
+        args = ['-silent', '-status-code', '-title', '-tech-detect']
         
         # 判断是文件还是列表
         if isinstance(urls, str) and os.path.exists(urls):
-            cmd += f' -l {urls}'
+            args.extend(['-l', urls])
         else:
             # 写入临时文件
             import tempfile
@@ -278,12 +290,13 @@ class HttpxRunner:
                 for url in urls:
                     f.write(url + '\n')
                 temp_file = f.name
-            cmd += f' -l {temp_file}'
+            args.extend(['-l', temp_file])
         
         if output_file:
-            cmd += f' -o {output_file}'
+            args.extend(['-o', output_file])
         
-        result = CommandRunner.run(cmd, timeout=300)
+        # 使用 run_safe 方法，防止命令注入
+        result = CommandRunner.run_safe(self.path, args, timeout=300)
         
         if result['success']:
             lines = result['stdout'].strip().split('\n')

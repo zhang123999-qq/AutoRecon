@@ -117,7 +117,7 @@ class SQLiteCache(BaseCache):
         """反序列化值"""
         try:
             return json.loads(value)
-        except:
+        except (json.JSONDecodeError, TypeError):
             return value
     
     async def get(self, key: str) -> Optional[Any]:
@@ -333,7 +333,8 @@ class RedisCache(BaseCache):
             client = self._get_client()
             hkey = self.prefix + self.hash_key(key)
             return client.exists(hkey) > 0
-        except:
+        except (redis.RedisError, redis.ConnectionError, OSError) as e:
+            logger.debug(f"Redis检查失败: {key} - {e}")
             return False
 
 

@@ -63,6 +63,15 @@ class AsyncCache:
 
 @dataclass
 class Proxy:
+    """代理配置类
+    
+    Attributes:
+        url: 代理地址（不含协议前缀）
+        protocol: 代理协议（http/socks5）
+        alive: 是否存活
+        latency: 延迟（毫秒）
+        fail_count: 失败次数
+    """
     url: str
     protocol: str = "http"  # http, socks5
     alive: bool = True
@@ -143,6 +152,16 @@ class ProxyPool:
 
 @dataclass
 class RetryConfig:
+    """重试配置类
+    
+    Attributes:
+        max_retries: 最大重试次数
+        base_delay: 基础延迟（秒）
+        max_delay: 最大延迟（秒）
+        exponential_base: 指数退避基数
+        jitter: 是否添加随机抖动
+        retryable_errors: 可重试的异常类型
+    """
     max_retries: int = 3
     base_delay: float = 1.0
     max_delay: float = 30.0

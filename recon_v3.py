@@ -120,8 +120,8 @@ def validate_target(target: str) -> str:
         try:
             if validators.domain(target):
                 return target
-        except:
-            pass
+        except (validators.ValidationError, TypeError) as e:
+            logger.debug(f"域名验证失败: {target} - {e}")
     else:
         if _validate_domain_builtin(target):
             return target
@@ -131,8 +131,8 @@ def validate_target(target: str) -> str:
         try:
             if validators.ip_address.ipv4(target) or validators.ip_address.ipv6(target):
                 return target
-        except:
-            pass
+        except (validators.ValidationError, TypeError) as e:
+            logger.debug(f"IP验证失败: {target} - {e}")
     else:
         if _validate_ip_builtin(target):
             return target
@@ -150,7 +150,7 @@ def validate_url(url: str) -> str:
         try:
             if not validators.url(url):
                 raise ValueError(f"无效的 URL: {url}")
-        except:
+        except (validators.ValidationError, TypeError):
             raise ValueError(f"无效的 URL: {url}")
     else:
         # 内置 URL 验证
@@ -158,8 +158,8 @@ def validate_url(url: str) -> str:
             parsed = urllib.parse.urlparse(url)
             if not parsed.scheme or not parsed.netloc:
                 raise ValueError(f"无效的 URL: {url}")
-        except:
-            raise ValueError(f"无效的 URL: {url}")
+        except (ValueError, AttributeError) as e:
+            raise ValueError(f"无效的 URL: {url} - {e}")
     
     # 只允许 http/https
     parsed = urllib.parse.urlparse(url)
@@ -360,12 +360,14 @@ class ReconToolV3:
                 try:
                     resp = await client.get(f"https://{self.target}")
                     headers = {k.lower(): v.lower() for k, v in resp.get('headers', {}).items()}
-                except:
+                except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                    logger.debug(f"HTTPS请求失败: {e}")
                     # HTTPS 失败，尝试 HTTP
                     try:
                         resp = await client.get(f"http://{self.target}")
                         headers = {k.lower(): v.lower() for k, v in resp.get('headers', {}).items()}
-                    except:
+                    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                        logger.debug(f"HTTP请求也失败: {e}")
                         headers = {}
                 
                 cdn_headers = {

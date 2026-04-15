@@ -2,7 +2,43 @@
 # -*- coding: utf-8 -*-
 """
 DNS解析模块
+
+⚠️ 已废弃警告 ⚠
+--------------
+此模块已废弃，建议使用异步版本：
+    from core.async_engine import AsyncDNSResolver
+
+原因：
+    1. 使用同步 socket 调用，阻塞事件循环
+    2. 异常处理过宽：`except: return None`
+    3. 不符合项目异步架构
+
+迁移示例：
+    # 旧代码
+    ip = DNSResolver.resolve(hostname)
+    
+    # 新代码
+    resolver = AsyncDNSResolver()
+    ip = await resolver.resolve(hostname)
+
+废弃版本: v3.3.0
+移除版本: v4.0.0
 """
+
+import warnings
+
+# 显示废弃警告
+warnings.warn(
+    "\n"
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    "⚠️  DNSResolver 已废弃\n"
+    "请使用: from core.async_engine import AsyncDNSResolver\n"
+    "原因: 同步方式、异常处理过宽、阻塞事件循环\n"
+    "废弃版本: v3.3.0 | 移除版本: v4.0.0\n"
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import socket
 from typing import List, Optional
@@ -23,7 +59,8 @@ class DNSResolver:
         """
         try:
             return socket.gethostbyname(hostname)
-        except:
+        except (socket.gaierror, socket.herror, OSError) as e:
+            logger.debug(f"DNS解析失败: {hostname} - {e}")
             return None
     
     @staticmethod
@@ -42,7 +79,8 @@ class DNSResolver:
             for r in results:
                 ips.add(r[4][0])
             return list(ips)
-        except:
+        except (socket.gaierror, socket.herror, OSError) as e:
+            logger.debug(f"DNS解析失败: {hostname} - {e}")
             return []
     
     @staticmethod
@@ -58,7 +96,8 @@ class DNSResolver:
         try:
             result = socket.gethostbyaddr(ip)
             return result[0]
-        except:
+        except (socket.gaierror, socket.herror, OSError) as e:
+            logger.debug(f"反向DNS解析失败: {ip} - {e}")
             return None
     
     @staticmethod
@@ -75,7 +114,8 @@ class DNSResolver:
             import dns.resolver
             answers = dns.resolver.resolve(domain, 'MX')
             return [str(r.exchange) for r in answers]
-        except:
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers, ImportError) as e:
+            logger.debug(f"获取MX记录失败: {domain} - {e}")
             return []
     
     @staticmethod
@@ -92,7 +132,8 @@ class DNSResolver:
             import dns.resolver
             answers = dns.resolver.resolve(domain, 'TXT')
             return [str(r) for r in answers]
-        except:
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers, ImportError) as e:
+            logger.debug(f"获取TXT记录失败: {domain} - {e}")
             return []
     
     @staticmethod
@@ -122,7 +163,7 @@ class DNSResolver:
         try:
             socket.inet_aton(ip)
             return True
-        except:
+        except (OSError, socket.error):
             return False
     
     @staticmethod
@@ -139,5 +180,6 @@ class DNSResolver:
             import dns.resolver
             answers = dns.resolver.resolve(domain, 'CNAME')
             return str(answers[0].target)
-        except:
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers, ImportError) as e:
+            logger.debug(f"获取CNAME记录失败: {domain} - {e}")
             return None

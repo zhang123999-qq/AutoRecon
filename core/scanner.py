@@ -60,7 +60,8 @@ class PortChecker:
             result = sock.connect_ex((host, port))
             sock.close()
             return result == 0
-        except:
+        except (socket.error, OSError) as e:
+            logger.debug(f"端口检查失败: {host}:{port} - {e}")
             return False
     
     @staticmethod
@@ -83,7 +84,8 @@ class PortChecker:
             banner = sock.recv(1024).decode('utf-8', errors='ignore').strip()
             sock.close()
             return banner
-        except:
+        except (socket.error, socket.timeout, OSError) as e:
+            logger.debug(f"获取Banner失败: {host}:{port} - {e}")
             return None
     
     @staticmethod
@@ -193,7 +195,8 @@ class CDNDetector:
                 for pattern in patterns:
                     if pattern in cname:
                         return cdn
-        except:
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, ImportError) as e:
+            logger.debug(f"CNAME检测失败: {domain} - {e}")
             pass
         
         return None

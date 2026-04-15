@@ -230,7 +230,8 @@ class GitHubLeakScanner:
                                     content = base64.b64decode(data['content']).decode('utf-8', errors='ignore')
                                     file_secrets = self._scan_content(content, sensitive_file, repo_name)
                                     secrets.extend(file_secrets)
-                                except:
+                                except (UnicodeDecodeError, ValueError, base64.Error) as e:
+                                    logger.debug(f"解码文件失败: {sensitive_file} - {e}")
                                     pass
                 
                 # 避免速率限制

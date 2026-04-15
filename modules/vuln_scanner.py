@@ -19,6 +19,14 @@ from core.async_engine import AsyncHTTPClient, AsyncProgressBar
 
 
 class Severity(Enum):
+    """漏洞严重程度枚举
+    
+    Attributes:
+        HIGH: 高危漏洞
+        MEDIUM: 中危漏洞
+        LOW: 低危漏洞
+        INFO: 信息类问题
+    """
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
@@ -267,7 +275,8 @@ class VulnerabilityScanner:
                         self.vulnerabilities.append(vuln)
                         results.append(vuln)
                         break
-                except:
+                except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
+                    logger.debug(f"目录遍历测试失败: {e}")
                     pass
         
         if results:
@@ -323,7 +332,8 @@ class VulnerabilityScanner:
                             self.vulnerabilities.append(vuln)
                             results.append(vuln)
                             break
-                except:
+                except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
+                    logger.debug(f"SQL注入测试失败: {e}")
                     pass
         
         if results:
@@ -369,7 +379,8 @@ class VulnerabilityScanner:
                             self.vulnerabilities.append(vuln)
                             results.append(vuln)
                             break
-                    except:
+                    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
+                        logger.debug(f"XSS测试失败: {e}")
                         pass
         
         if results:

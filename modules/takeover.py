@@ -3,7 +3,43 @@
 """
 子域名接管检测模块 v2.2
 检测未使用的DNS记录是否可被接管
+
+⚠️ 已废弃警告 ⚠
+--------------
+此模块已废弃，建议使用异步版本：
+    from modules.async_takeover import AsyncTakeoverScanner
+
+原因：
+    1. 使用同步 HTTPClient，无 SSRF 防护
+    2. 使用外部命令执行（dig/nslookup）
+    3. 不符合项目异步架构
+
+迁移示例：
+    # 旧代码
+    scanner = SubdomainTakeoverScanner(domain)
+    results = scanner.scan()
+    
+    # 新代码
+    async with AsyncTakeoverScanner(domain) as scanner:
+        results = await scanner.scan()
+
+废弃版本: v3.3.0
+移除版本: v4.0.0
 """
+
+import warnings
+
+warnings.warn(
+    "\n"
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    "⚠️  SubdomainTakeoverScanner 已废弃\n"
+    "请使用: from modules.async_takeover import AsyncTakeoverScanner\n"
+    "原因: 同步方式、无 SSRF 防护、外部命令执行\n"
+    "废弃版本: v3.3.0 | 移除版本: v4.0.0\n"
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import sys
 import os

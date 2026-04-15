@@ -10,6 +10,7 @@ import time
 import random
 import re
 import logging
+import ast
 from typing import List, Dict, Optional, Any, Callable
 from dataclasses import dataclass, field
 from enum import Enum
@@ -370,11 +371,85 @@ class ScenarioRunner:
             "results": results
         }
     
-    async def _execute_condition(self, step: ConditionStep) -> Dict[str, Any]:
-        """执行条件判断"""
-        # 评估条件
+    # 安全表达式解析 - 允许的 AST 节点白名单
+    _ALLOWED_AST_NODES = {
+        ast.Expression, ast.BoolOp, ast.Compare, ast.BinOp,
+        ast.UnaryOp, ast.Constant, ast.Name, ast.Load,
+        ast.And, ast.Or, ast.Eq, ast.NotEq, ast.Lt, ast.LtE,
+        ast.Gt, ast.GtE, ast.In, ast.NotIn, ast.Add, ast.Sub,
+        ast.Mult, ast.Div, ast.Mod, ast.Not, ast.Is, ast.IsNot,
+        ast.List, ast.Tuple, ast.Dict, ast.Set, ast.Str, ast.Num,
+        ast.Index, ast.Slice, ast.Subscript
+        # 注意：移除了 ast.Attribute，防止 __class__.__bases__ 等危险属性访问
+    }
+    
+    # 危险属性黑名单
+    _BLOCKED_ATTRIBUTES = {
+        '__class__', '__bases__', '__subclasses__', '__mro__',
+        '__globals__', '__code__', '__builtins__', '__import__',
+        '__getattribute__', '__setattr__', '__delattr__',
+        'gi_frame', 'gi_code', 'cr_frame', 'cr_code',
+    }
+    
+    def _safe_eval_condition(self, condition: str, variables: Dict[str, Any]) -> bool:
+        """安全的条件表达式解析
+        
+        使用 AST 白名单机制，防止代码注入攻击。
+        只允许基本的比较和逻辑运算。
+        
+        Args:
+            condition: 条件表达式字符串
+            variables: 变量字典
+            
+        Returns:
+            条件结果
+            
+        Raises:
+            ValueError: 表达式包含不允许的操作
+        """
         try:
-            condition_result = eval(step.condition, {"__builtins__": {}}, self.variables)
+            # 解析为 AST
+            tree = ast.parse(condition, mode='eval')
+            
+            # 检查所有节点是否在白名单中
+            for node in ast.walk(tree):
+                if type(node) not in self._ALLOWED_AST_NODES:
+                    raise ValueError(
+                        f"安全限制: 表达式包含不允许的操作 '{type(node).__name__}'。"
+                        f"条件: {condition}"
+                    )
+                
+                # 检查危险属性访问
+                if isinstance(node, ast.Attribute):
+                    if node.attr in self._BLOCKED_ATTRIBUTES:
+                        raise ValueError(
+                            f"安全限制: 禁止访问危险属性 '{node.attr}'。"
+                            f"条件: {condition}"
+                        )
+            
+            # 安全执行（已验证 AST 节点）
+            return eval(compile(tree, '<condition>', 'eval'), {"__builtins__": {}}, variables)
+        
+        except SyntaxError as e:
+            logger.warning(f"条件语法错误: {condition} - {e}")
+            return False
+        except ValueError:
+            raise  # 重新抛出安全限制错误
+        except Exception as e:
+            logger.warning(f"条件评估失败: {condition} - {e}")
+            return False
+    
+    async def _execute_condition(self, step: ConditionStep) -> Dict[str, Any]:
+        """执行条件判断
+        
+        使用安全的表达式解析器，防止代码注入。
+        """
+        # 使用安全的条件评估
+        try:
+            condition_result = self._safe_eval_condition(step.condition, self.variables)
+        except ValueError as e:
+            logger.error(f"安全限制: {e}")
+            condition_result = False
         except Exception as e:
             logger.warning(f"条件评估失败: {e}")
             condition_result = False

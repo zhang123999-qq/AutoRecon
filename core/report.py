@@ -13,7 +13,7 @@ from typing import Dict, Any, List
 class ReportGenerator:
     """报告生成器"""
     
-    def __init__(self, output_dir: str = 'reports'):
+    def __init__(self, output_dir: str = 'reports') -> None:
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
     
