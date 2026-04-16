@@ -11,6 +11,7 @@ import json
 import uuid
 import time
 from datetime import datetime, timedelta
+import re
 from typing import Dict, List, Optional
 from pathlib import Path
 
@@ -233,6 +234,7 @@ class WebScanRunner:
     def __init__(self, scan_id: str, target: str, modules: List[str], threads: int = 50):
         self.scan_id = scan_id
         self.target = target
+        self.target_clean = self._clean_target_for_filename(target)
         self.modules = modules
         self.threads = threads
         
@@ -245,6 +247,33 @@ class WebScanRunner:
         self.end_time = None
         self.progress = 0
         self.current_module = ""
+    
+    def _ensure_url(self, target: str) -> str:
+        """确保目标有协议前缀，避免重复添加
+        
+        支持格式:
+        - example.com -> http://example.com
+        - http://example.com -> http://example.com (不变)
+        - https://example.com -> https://example.com (不变)
+        """
+        if target.startswith('http://') or target.startswith('https://'):
+            return target
+        return f"http://{target}"
+    
+    def _clean_target_for_filename(self, target: str) -> str:
+        """清理目标字符串，使其可以作为文件名
+        
+        将 https://www.example.com 转换为 www.example.com
+        """
+        # 移除协议前缀
+        cleaned = re.sub(r'^https?://', '', target)
+        # 移除路径
+        cleaned = cleaned.split('/')[0]
+        # 移除端口 (可选)
+        # cleaned = cleaned.split(':')[0]
+        # 替换非法字符
+        cleaned = re.sub(r'[<>:"/\\|?*]', '_', cleaned)
+        return cleaned
     
     async def broadcast_progress(self, module_name: str, progress: int):
         """广播进度更新"""
@@ -334,10 +363,10 @@ class WebScanRunner:
         """CDN检测"""
         from core.async_engine import AsyncHTTPClient
         
-        results = {'domain': self.target, 'cdn': None, 'ips': []}
+        results = {'domain': self.target_clean, 'cdn': None, 'ips': []}
         
         # 解析IP
-        ips = await self.dns.resolve_all(self.target)
+        ips = await self.dns.resolve_all(self.target_clean)
         results['ips'] = ips
         
         # CDN IP特征检测
@@ -358,7 +387,7 @@ class WebScanRunner:
         # HTTP头检测
         if not results['cdn']:
             async with AsyncHTTPClient() as client:
-                resp = await client.get(f"http://{self.target}")
+                resp = await client.get(self._ensure_url(self.target))
                 headers = {k.lower(): v.lower() for k, v in resp.get('headers', {}).items()}
                 
                 cdn_headers = {
@@ -392,10 +421,10 @@ class WebScanRunner:
             'JWT': r'eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*',
         }
         
-        results = {'url': f"http://{self.target}", 'findings': []}
+        results = {'url': self._ensure_url(self.target), 'findings': []}
         
         async with AsyncHTTPClient() as client:
-            resp = await client.get(f"http://{self.target}")
+            resp = await client.get(self._ensure_url(self.target))
             body = resp.get('body', '')
             
             for name, pattern in patterns.items():
@@ -418,7 +447,7 @@ class WebScanRunner:
         results = {'fingerprints': []}
         
         async with AsyncHTTPClient() as client:
-            resp = await client.get(f"http://{self.target}")
+            resp = await client.get(self._ensure_url(self.target))
             body = resp.get('body', '')
             headers = resp.get('headers', {})
             
@@ -525,7 +554,7 @@ class WebScanRunner:
                 **self.results
             }
             
-            self.store.save_json(self.target, report_data)
+            self.store.save_json(self.target_clean, report_data)
         except Exception as e:
             print(f"保存报告失败: {e}")
 
