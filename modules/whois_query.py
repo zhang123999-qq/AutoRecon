@@ -27,6 +27,7 @@ Whois查询模块
 """
 
 import warnings
+import logging
 
 warnings.warn(
     "\n"
@@ -47,6 +48,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils import Logger, CommandRunner
 from config import CONFIG
+
+logger = logging.getLogger(__name__)
 
 
 class WhoisQuery:

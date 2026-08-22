@@ -7,6 +7,7 @@ AutoRecon v3.0 - 漏洞扫描模块
 
 import asyncio
 import re
+import logging
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 from enum import Enum
@@ -16,6 +17,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.async_engine import AsyncHTTPClient, AsyncProgressBar
+
+logger = logging.getLogger(__name__)
 
 
 class Severity(Enum):

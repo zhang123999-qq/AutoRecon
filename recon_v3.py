@@ -27,11 +27,14 @@ import sys
 import os
 import argparse
 import time
+import logging
 from datetime import datetime
 from typing import List, Dict, Optional
 
 # 添加项目路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+logger = logging.getLogger(__name__)
 
 from core.async_engine import (
     AsyncHTTPClient, AsyncDNSResolver, AsyncCache,

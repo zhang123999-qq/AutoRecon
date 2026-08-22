@@ -12,11 +12,14 @@ import hashlib
 import os
 import sqlite3
 import threading
+import logging
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Dict, List
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass

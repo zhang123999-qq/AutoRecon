@@ -9,7 +9,10 @@ import sys
 import time
 import threading
 import subprocess
+import logging
 from typing import Callable, Any, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 class ProgressBar:

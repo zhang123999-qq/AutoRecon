@@ -295,6 +295,37 @@ class AsyncDNSResolver:
         random_sub = f"{random.randint(100000, 999999)}.{domain}"
         ips = await self.resolve_all(random_sub)
         return len(ips) > 0
+    
+    async def resolve_batch(self, domains: List[str], limit: int = 100) -> Dict[str, List[str]]:
+        """批量解析域名，限制并发数
+        
+        Args:
+            domains: 域名列表
+            limit: 最大并发数
+            
+        Returns:
+            域名 -> IP列表 的字典
+        """
+        semaphore = asyncio.Semaphore(limit)
+        
+        async def resolve_one(domain: str):
+            async with semaphore:
+                ips = await self.resolve_all(domain)
+                return domain, ips
+        
+        tasks = [resolve_one(d) for d in domains]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        resolved = {}
+        for result in results:
+            if isinstance(result, Exception):
+                logger.debug(f"批量解析异常: {result}")
+            elif isinstance(result, tuple) and len(result) == 2:
+                domain, ips = result
+                if ips:
+                    resolved[domain] = ips
+        
+        return resolved
 
 
 # ============== HTTP 客户端 ==============

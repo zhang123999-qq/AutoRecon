@@ -10,6 +10,7 @@ import asyncio
 import json
 import uuid
 import time
+import logging
 from datetime import datetime, timedelta
 import re
 from typing import Dict, List, Optional
@@ -18,6 +19,8 @@ from pathlib import Path
 # 添加项目根目录到路径
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT_DIR))
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks, Depends
 from fastapi.staticfiles import StaticFiles
@@ -857,12 +860,14 @@ class StressTestRequest(BaseModel):
         concurrent: 并发数
         duration: 持续时间（秒）
         timeout: 超时时间（秒）
+        max_concurrent: 最大并发数（无上限模式）
     """
     url: str
     mode: str = "quick"  # quick, intelligent, capacity
     concurrent: int = 10
     duration: int = 10
     timeout: int = 30
+    max_concurrent: int = 10000
 
 
 class StressTestStatus(BaseModel):
@@ -947,8 +952,8 @@ async def run_stress_test_task(test_id: str, request: StressTestRequest):
             target_url=request.url,
             concurrent_users=request.concurrent,
             duration=request.duration,
-            timeout=request.timeout if hasattr(request, 'timeout') else 30,
-            max_concurrent=request.max_concurrent if hasattr(request, 'max_concurrent') else 10000
+            timeout=request.timeout,
+            max_concurrent=request.max_concurrent
         )
         
         tester = StressTester(config)
@@ -1017,7 +1022,7 @@ async def quick_stress_test(request: StressTestRequest):
             mode="quick",
             concurrent=request.concurrent,
             duration=request.duration,
-            max_concurrent=request.max_concurrent if hasattr(request, 'max_concurrent') else 10000
+            max_concurrent=request.max_concurrent
         )
         # 使用 JSONResponse 确保正确计算 Content-Length
         return JSONResponse(content=result)

@@ -7,9 +7,12 @@
 import re
 import socket
 import threading
+import logging
 from typing import List, Dict, Optional
 
 from .dns import DNSResolver
+
+logger = logging.getLogger(__name__)
 
 # 导入 CDN 特征库
 try:

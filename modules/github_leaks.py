@@ -8,9 +8,12 @@ AutoRecon v3.0 - GitHub 信息泄露检测模块
 import asyncio
 import re
 import aiohttp
+import logging
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class SecretType(Enum):

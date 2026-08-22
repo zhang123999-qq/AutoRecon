@@ -26,6 +26,7 @@ DNS解析模块
 """
 
 import warnings
+import logging
 
 # 显示废弃警告
 warnings.warn(
@@ -42,6 +43,8 @@ warnings.warn(
 
 import socket
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class DNSResolver:

@@ -124,6 +124,7 @@ class AsyncSubdomainCollector:
         print(f"[\u001b[36m*\u001b[0m] 证书透明度日志查询...")
         
         results = []
+        new_subdomains = set()
         
         try:
             async with AsyncHTTPClient() as client:
@@ -136,22 +137,27 @@ class AsyncSubdomainCollector:
                     for entry in data:
                         name = entry.get("name_value", "")
                         for sub in name.split('\n'):
-                            sub = sub.strip().lower()
+                            sub = sub.strip().lower().rstrip('.')
                             # 过滤通配符
                             if sub.endswith(self.domain) and '*' not in sub:
                                 if sub not in self.subdomains:
                                     self.subdomains.add(sub)
-                                    ip = (await self.dns.resolve_all(sub))[0] if await self.dns.resolve_all(sub) else None
-                                    result = SubdomainResult(
-                                        subdomain=sub,
-                                        ip=ip,
-                                        source="certificate"
-                                    )
-                                    self.results.append(result)
-                                    results.append(result)
+                                    new_subdomains.add(sub)
         
         except Exception as e:
             print(f"[\u001b[33m!\u001b[0m] 证书查询失败: {e}")
+        
+        # 批量解析收集到的子域名
+        if new_subdomains:
+            resolved = await self.dns.resolve_batch(list(new_subdomains))
+            for sub, ips in resolved.items():
+                result = SubdomainResult(
+                    subdomain=sub,
+                    ip=ips[0] if ips else None,
+                    source="certificate"
+                )
+                self.results.append(result)
+                results.append(result)
         
         self.stats["certificate"] = len(results)
         print(f"[\u001b[32m+\u001b[0m] 证书透明度发现: {len(results)} 个新子域名")
@@ -197,6 +203,7 @@ class AsyncSubdomainCollector:
         print(f"[\u001b[36m*\u001b[0m] RapidDNS 查询...")
         
         results = []
+        new_subdomains = set()
         
         try:
             async with AsyncHTTPClient() as client:
@@ -211,17 +218,22 @@ class AsyncSubdomainCollector:
                     for sub in set(matches):
                         if sub not in self.subdomains:
                             self.subdomains.add(sub)
-                            ip = (await self.dns.resolve_all(sub))[0] if await self.dns.resolve_all(sub) else None
-                            result = SubdomainResult(
-                                subdomain=sub,
-                                ip=ip,
-                                source="rapiddns"
-                            )
-                            self.results.append(result)
-                            results.append(result)
+                            new_subdomains.add(sub)
         
         except Exception as e:
             print(f"[\u001b[33m!\u001b[0m] RapidDNS 查询失败: {e}")
+        
+        # 批量解析收集到的子域名
+        if new_subdomains:
+            resolved = await self.dns.resolve_batch(list(new_subdomains))
+            for sub, ips in resolved.items():
+                result = SubdomainResult(
+                    subdomain=sub,
+                    ip=ips[0] if ips else None,
+                    source="rapiddns"
+                )
+                self.results.append(result)
+                results.append(result)
         
         print(f"[\u001b[32m+\u001b[0m] RapidDNS 发现: {len(results)} 个新子域名")
         return results
@@ -231,6 +243,7 @@ class AsyncSubdomainCollector:
         print(f"[\u001b[36m*\u001b[0m] Web Archive 查询...")
         
         results = []
+        new_subdomains = set()
         
         try:
             async with AsyncHTTPClient() as client:
@@ -246,22 +259,27 @@ class AsyncSubdomainCollector:
                                 # 提取域名
                                 match = re.search(r'://([^/]+)', url)
                                 if match:
-                                    sub = match.group(1).lower()
+                                    sub = match.group(1).lower().rstrip('.')
                                     if sub.endswith(self.domain) and sub not in self.subdomains:
                                         self.subdomains.add(sub)
-                                        ip = (await self.dns.resolve_all(sub))[0] if await self.dns.resolve_all(sub) else None
-                                        result = SubdomainResult(
-                                            subdomain=sub,
-                                            ip=ip,
-                                            source="webarchive"
-                                        )
-                                        self.results.append(result)
-                                        results.append(result)
+                                        new_subdomains.add(sub)
                     except json.JSONDecodeError:
                         pass
         
         except Exception as e:
             print(f"[\u001b[33m!\u001b[0m] Web Archive 查询失败: {e}")
+        
+        # 批量解析收集到的子域名
+        if new_subdomains:
+            resolved = await self.dns.resolve_batch(list(new_subdomains))
+            for sub, ips in resolved.items():
+                result = SubdomainResult(
+                    subdomain=sub,
+                    ip=ips[0] if ips else None,
+                    source="webarchive"
+                )
+                self.results.append(result)
+                results.append(result)
         
         print(f"[\u001b[32m+\u001b[0m] Web Archive 发现: {len(results)} 个新子域名")
         return results
